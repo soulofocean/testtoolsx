@@ -228,14 +228,14 @@ if __name__ == '__main__':
     sys_init()
     global ipv4_list
     if arg_handle.get_args('device_count') > 1:
-        log_level = logging.WARN
+        log_level = logging.DEBUG
     else:
-        log_level = logging.INFO
+        log_level = logging.DEBUG
 
     sims = []
     for i in range(arg_handle.get_args('device_count')):
         dev_LOG = MyLogger('dev_sim_%d.log' % (
-            i), clevel=log_level, flevel=log_level, fenable=False)
+            i), clevel=log_level, flevel=log_level, fenable=True)
 
         if ipv4_list:
             id = i % len(ipv4_list)
@@ -245,8 +245,10 @@ if __name__ == '__main__':
         else:
             self_addr = None
 
-        sim = Dev(logger=dev_LOG, config_file=arg_handle.get_args('config_file'), server_addr=(
-            arg_handle.get_args('server_IP'), arg_handle.get_args('server_port')), N=arg_handle.get_args('xx') + i, tt=arg_handle.get_args('tt'), encrypt_flag=arg_handle.get_args('encrypt'), self_addr=self_addr)
+        sim = Dev(logger=dev_LOG, config_file=arg_handle.get_args('config_file'),
+                  server_addr=(arg_handle.get_args('server_IP'), arg_handle.get_args('server_port')),
+                  N=arg_handle.get_args('xx') + i,tt=arg_handle.get_args('tt'),
+                  encrypt_flag=arg_handle.get_args('encrypt'), self_addr=self_addr)
         if self_addr:
             sim.set_item('_ip', self_addr[0])
         sim.run_forever()
