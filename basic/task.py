@@ -110,7 +110,7 @@ class Task():
                     else:
                         pass
                 self.lock.release()
-                time.sleep(0.01)
+                time.sleep(0.1)
 
             except RuntimeError:
                 pass
