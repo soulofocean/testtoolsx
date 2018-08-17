@@ -147,15 +147,23 @@ class Dev(BaseSim):
         self.task_obj = Task('Washer-task', self.LOG)
         self.dev_register = False
         self.command_list = getattr(self.sim_config, "Command_list")
-        self.create_tasks()
+        #self.create_tasks()
+
+        self.heartbeat_interval_s = 30
+        self.reg_dev_relay_s = 1
+        self.maintain_inv_s = 1
+        self.report_inv_s = 0.01
 
     def run_forever(self):
         thread_list = []
         thread_list.append([self.sdk_obj.schedule_loop])
         thread_list.append([self.sdk_obj.send_data_loop])
         thread_list.append([self.sdk_obj.recv_data_loop])
-        # thread_list.append([self.sdk_obj.heartbeat_loop])
-        thread_list.append([self.task_obj.task_proc])
+        #thread_list.append([self.sdk_obj.heartbeat_loop])
+        thread_list.append([self.to_send_heartbeat])
+        #thread_list.append([self.task_obj.task_proc])
+        thread_list.append([self.status_maintain])
+        thread_list.append([self.status_report_monitor])
         thread_list.append([self.msg_dispatch])
         thread_ids = []
         for th in thread_list:
@@ -164,19 +172,22 @@ class Dev(BaseSim):
         for th in thread_ids:
             th.setDaemon(True)
             th.start()
+        time.sleep(self.reg_dev_relay_s)#wait the send_data_loop thread to start
+        self.to_register_dev()
 
     def create_tasks(self):
-        self.task_obj.add_task(
-            'status maintain', self.status_maintain, 10000000, 100)
+        pass
+        #self.task_obj.add_task(
+            #'status maintain', self.status_maintain, 10000000, 10)
 
-        self.task_obj.add_task('monitor status report',
-                               self.status_report_monitor, 10000000, 1)
+        #self.task_obj.add_task('monitor status report',
+                               #self.status_report_monitor, 10000000, 1)
 
-        self.task_obj.add_task(
-            'dev register', self.to_register_dev, 1, 100)
+        #self.task_obj.add_task(
+            #'dev register', self.to_register_dev, 1, 10)
 
-        self.task_obj.add_task(
-            'heartbeat', self.to_send_heartbeat, 1000000, 3000)
+        #self.task_obj.add_task(
+            #'heartbeat', self.to_send_heartbeat, 1000000, 300)
 
     def msg_dispatch(self):
         msgs = []
@@ -213,42 +224,46 @@ class Dev(BaseSim):
                     self.LOG.error("Unknow msg to dispatch: %s" % (msg))
 
     def status_maintain(self):
-        for item in self.SPECIAL_ITEM:
-            if "maintain" not in self.SPECIAL_ITEM[item]["use"]:
-                continue
-            if self.__dict__[item] != self.SPECIAL_ITEM[item]["init_value"]:
-                tmp_item = '_current_time_' + item
-                if '_current_time_' + item in self.__dict__:
-                    if self.__dict__[tmp_item] > 0:
-                        self.set_item(tmp_item, self.__dict__[tmp_item] - 1)
-                        if self.__dict__[tmp_item] <= 0:
-                            self.set_item(
-                                tmp_item, self.SPECIAL_ITEM[item]["wait_time"])
+        while self.need_stop == False:
+            for item in self.SPECIAL_ITEM:
+                if "maintain" not in self.SPECIAL_ITEM[item]["use"]:
+                    continue
+                if self.__dict__[item] != self.SPECIAL_ITEM[item]["init_value"]:
+                    tmp_item = '_current_time_' + item
+                    if '_current_time_' + item in self.__dict__:
+                        if self.__dict__[tmp_item] > 0:
+                            self.set_item(tmp_item, self.__dict__[tmp_item] - 1)
+                            if self.__dict__[tmp_item] <= 0:
+                                self.set_item(
+                                    tmp_item, self.SPECIAL_ITEM[item]["wait_time"])
+                                self.set_item(
+                                    item, self.SPECIAL_ITEM[item]["init_value"])
+                        else:
                             self.set_item(
                                 item, self.SPECIAL_ITEM[item]["init_value"])
                     else:
-                        self.set_item(
-                            item, self.SPECIAL_ITEM[item]["init_value"])
-                else:
-                    self.add_item('_current_time_' + item,
-                                  self.SPECIAL_ITEM[item]["wait_time"])
+                        self.add_item('_current_time_' + item,
+                                      self.SPECIAL_ITEM[item]["wait_time"])
+            time.sleep(self.maintain_inv_s)
 
     def status_report_monitor(self):
-        need_send_report = False
-        if not hasattr(self, 'old_status'):
-            self.old_status = defaultdict(lambda: {})
-            for item in self.__dict__:
-                if item in self.SPECIAL_ITEM and "report" in self.SPECIAL_ITEM[item]["use"]:
-                    self.LOG.yinfo("need check item: %s" % (item))
+        while self.need_stop == False:
+            need_send_report = False
+            if not hasattr(self, 'old_status'):
+                self.old_status = defaultdict(lambda: {})
+                for item in self.__dict__:
+                    if item in self.SPECIAL_ITEM and "report" in self.SPECIAL_ITEM[item]["use"]:
+                        self.LOG.yinfo("need check item: %s" % (item))
+                        self.old_status[item] = copy.deepcopy(self.__dict__[item])
+
+            for item in self.old_status:
+                if self.old_status[item] != self.__dict__[item]:
+                    need_send_report = True
                     self.old_status[item] = copy.deepcopy(self.__dict__[item])
 
-        for item in self.old_status:
-            if self.old_status[item] != self.__dict__[item]:
-                need_send_report = True
-                self.old_status[item] = copy.deepcopy(self.__dict__[item])
-
-        if need_send_report:
-            self.send_msg(self.get_upload_status(), ack=b'\x00')
+            if need_send_report:
+                self.send_msg(self.get_upload_status(), ack=b'\x00')
+        time.sleep(self.report_inv_s)
 
     def to_register_dev(self):
         if self.dev_register:
@@ -259,9 +274,12 @@ class Dev(BaseSim):
                 self.get_send_msg('COM_DEV_REGISTER')), ack=b'\x00')
 
     def to_send_heartbeat(self):
-        if self.dev_register:
-            self.send_msg(json.dumps(
-                self.get_send_msg('COM_HEARTBEAT')), ack=b'\x00')
+        while self.need_stop == False:
+            self.LOG.info("Thread to_send_heartbeat")
+            if self.dev_register:
+                self.send_msg(json.dumps(
+                    self.get_send_msg('COM_HEARTBEAT')), ack=b'\x00')
+            time.sleep(self.heartbeat_interval_s)
 
     def get_upload_status(self):
         self.LOG.warn(common_APIs.chinese_show("设备状态上报"))
