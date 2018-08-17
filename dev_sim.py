@@ -223,8 +223,17 @@ def sys_init():
 def sys_cleanup():
     LOG.info("Goodbye!!!")
 
+def delallLog(doit = True):
+    if doit:
+        files = os.listdir(os.getcwd())
+        print(files)
+        for file in files:
+            if( file.find(".log") != -1):
+                os.remove(file)
+                print("file:%s is removed" % (file,))
 
 if __name__ == '__main__':
+    delallLog()
     sys_init()
     global ipv4_list
     if arg_handle.get_args('device_count') > 1:
@@ -239,8 +248,9 @@ if __name__ == '__main__':
 
         if ipv4_list:
             id = i % len(ipv4_list)
-            self_addr = (ipv4_list[id], random.randint(
-                arg_handle.get_args('server_port'), 65535))
+            #self_addr = (ipv4_list[id], random.randint(
+                #arg_handle.get_args('server_port'), 65535))
+            self_addr = (ipv4_list[id], 0)
             dev_LOG.warn('self addr is: %s' % (str(self_addr)))
         else:
             self_addr = None
