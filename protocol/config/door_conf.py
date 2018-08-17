@@ -5,6 +5,7 @@ import random
 import re
 
 # 设备初始化参数
+# 1005200959FCDBDA1000
 Attribute_initialization = {
     "mac_list": ['59:FC:DB:DA:' + re.sub(r'^(?P<xx>\d\d)', "\g<xx>:", str(i)) for i in range(1000, 4000)],
     "DeviceFacturer": 1005,
