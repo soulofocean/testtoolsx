@@ -41,7 +41,7 @@ class communication_base(object):
         self.need_stop = False
 
     @abstractmethod
-    def protocol_handler(self, msg):
+    def protocol_handler(self, *args, **kwargs):
         pass
 
     @abstractmethod
@@ -187,4 +187,5 @@ class communication_base(object):
 
 
 if __name__ == '__main__':
-    p = PProcess(None)
+    #p = PProcess(None)
+    pass
