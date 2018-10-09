@@ -63,7 +63,7 @@ class communication_base(object):
             th.start()
 
     @abstractmethod
-    def msg_build(self):
+    def msg_build(self,*args,**kwargs):
         pass
 
     @abstractmethod
@@ -85,7 +85,7 @@ class communication_base(object):
         pass
 
     @abstractmethod
-    def recv_data(self, data):
+    def recv_data(self):
         pass
 
     def add_send_data(self, data):
