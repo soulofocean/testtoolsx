@@ -120,7 +120,7 @@ class SDK(communication_base):
         self.pkg_number = struct.pack('>I', pkg_number)
 
     def get_pkg_number(self, data):
-        return truct.unpack('>I', data)[0]
+        return struct.unpack('>I', data)[0]
 
     def set_pkg_number(self, data):
         self.pkg_number = data
