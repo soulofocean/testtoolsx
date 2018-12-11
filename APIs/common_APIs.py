@@ -17,6 +17,11 @@ import sys
 import threading
 from binascii import unhexlify
 from subprocess import *
+import qrcode
+from PIL import  Image
+from PIL import ImageDraw
+from PIL import ImageFont
+import configparser
 
 import crcmod.predefined
 
@@ -29,6 +34,53 @@ def file_unlock(open_file):
     return fcntl.flock(open_file, fcntl.LOCK_UN)
 '''
 
+def GetQrCodeByUrlAndSn(url,sn,imgFile='qrcode.png',snTtf='arial2.ttf',snSize=20,showImg=True):
+    '''将URL和SN生成二维码保存到imgFile中，SN字体采用snTtf，大小为snSize，showImg为TRUE显示生成的图片'''
+    img = qrcode.make(url)
+    img.save(imgFile)
+    img = Image.open(imgFile)
+    w, h = img.size
+    font = ImageFont.truetype(font=snTtf, size=snSize)
+    draw = ImageDraw.Draw(img)
+    draw.text(((w - 100) / 2, h - 30), sn, font=font)
+    img.save(imgFile)
+    if showImg:
+        #img.show()
+        os.system(imgFile)
+
+def ShowQrCodeImage(url, sn, imgFile,snTtf='arial.ttf',snSize=20):
+    '''如果imgFile存在则直接打开，否则用URL和SN以及字体文件和字体大小调用GetQrCodeByUrlAndSn生成图片并打开'''
+    if os.path.isfile(imgFile) and os.access(imgFile, os.R_OK):
+        os.system(imgFile)
+        #img = Image.open(imgFile)
+        #img.show()
+    else:
+        GetQrCodeByUrlAndSn(url,sn,imgFile,snTtf,snSize,True)
+
+def save_ini_file(filename, section, **kw):
+    '''保存INI文件到filename中section，加上KW键值对'''
+    cf = configparser.ConfigParser()
+    cf.read(filename)
+    if not cf.has_section(section):
+        cf.add_section(section)
+    for k,v in kw.items():
+        cf.set(section, k, v)
+    with open(filename, "w+") as f:
+        cf.write(f)
+        f.close()
+
+def read_ini_file(filename, section, *options):
+    '''从filename中的section读取KEY在options里面的值，并返回键值对'''
+    resultDict = {}
+    cf = configparser.ConfigParser()
+    cf.read(filename)
+    if cf.has_section(section):
+        for op in options:
+            if(cf.has_option(section,op)):
+                resultDict[op] = cf.get(section,op)
+            else:
+                resultDict[op] = None
+    return resultDict
 
 def get_output(*popenargs, **kwargs):
     process = Popen(*popenargs, stdout=PIPE, **kwargs)
