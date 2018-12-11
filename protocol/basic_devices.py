@@ -39,6 +39,23 @@ class BaseSim():
         else:
             self.LOG.error("Unknow item: %s" % (item))
 
+    def try_set_item(self, item, value):
+        '''尝试设置item为value,如果item不存在或者value无变化不会设置并返回FALSE，否则进行设置并返回TRUE'''
+        if item in self.__dict__:
+            if(self.__dict__[item]!=value):
+                self.__dict__[item] = value
+                return True
+            return False
+        else:
+            self.LOG.error("Unknow item: %s" % (item))
+            return False
+
+    def get_item(self, item):
+        if item in self.__dict__:
+            return self.__dict__[item]
+        else:
+            self.LOG.error("Unknow item: %s" % (item))
+
     def add_item(self, item, value):
         try:
             setattr(self, item, value)

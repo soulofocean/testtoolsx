@@ -15,7 +15,8 @@ from cmd import Cmd
 
 import APIs.common_APIs as common_APIs
 from basic.log_tool import MyLogger
-from protocol.cdz_devices import CDZ_Dev
+from protocol.cdz_devices import CDZ_Dev,ReportType
+from basic.cprint import cprint
 
 
 class ArgHandle():
@@ -44,7 +45,7 @@ class ArgHandle():
             '-e', '--encrypt',
             dest='encrypt',
             action='store',
-            default=1,
+            default=0,
             type=int,
             help='encrypt',
         )
@@ -52,22 +53,22 @@ class ArgHandle():
             '-p', '--server-port',
             dest='server_port',
             action='store',
-            default=20001,
+            default=2011,
             type=int,
-            help='Specify TCP server port, default is 20001',
+            help='Specify TCP server port, default is 20011',
         )
         parser.add_argument(
             '-i', '--server-IP',
             dest='server_IP',
             action='store',
-            default='192.168.10.12',
+            default='10.101.70.100',
             help='Specify TCP server IP address',
         )
         parser.add_argument(
             '--config',
             dest='config_file',
             action='store',
-            default="door_conf",
+            default="cdz_cz_conf",
             help='Specify device type',
         )
         parser.add_argument(
@@ -115,7 +116,7 @@ class ArgHandle():
 class MyCmd(Cmd):
     def __init__(self, logger, sim_objs=None):
         Cmd.__init__(self)
-        self.prompt = "SIM>"
+        self.prompt = "CDZ>"
         self.sim_objs = sim_objs
         self.LOG = logger
 
@@ -169,6 +170,11 @@ class MyCmd(Cmd):
         args = arg.split()
         for i in self.sim_objs:
             i.set_item(args[0], args[1])
+        #print(args[0] == "_isCharging")
+        #print(args[1] == "1")
+        #if args[0] == "_isCharging" and args[1] == "1":
+        #    self.sim_objs[0].set_item(args[0], int(args[1]))
+        #    self.sim_objs[0].send_charging_report_onetime()
 
     def default(self, arg, opts=None):
         try:
@@ -187,6 +193,54 @@ class MyCmd(Cmd):
         sys_cleanup()
         sys.exit()
 
+    def help_c(self):
+        cprint.notice_p("INPUT: c [3,7] [status]")
+        cprint.notice_p("3 status: 0表示未连接，1表示连接但是未供电，2表示正在供电中")
+        cprint.notice_p("7 status: 0表示未连接，1表示插座、枪已连接好，2表示插座、枪、车已经连接好但是未供电，"
+                        "3表示插座、枪、车已经连接好且已经给车发送开始充电指令，4表示插座、枪、车已经连接好且正在充电")
+        cprint.notice_p("3孔只能设置[0,1] 7孔只能设置[0,1,2]")
+        cprint.notice_p("设置3孔状态大于1的时候7孔会联动设置为0，反之亦然")
+
+    def do_c(self,arg,opts=None):
+        args = arg.split()
+        if len(args)!=2 or args[0] not in ["3","7"]:
+            return self.help_c()
+        if (args[0]=="3" and args[1] not in ("0","1")) or (args[0]=="7" and args[1] not in ("0","1","2")):
+            return self.help_c()
+        self.sim_objs[0].switch_connect(int(args[0]),int(args[1]))
+
+    def help_us(self):
+        cprint.notice_p("模拟各种异常事件")
+        cprint.notice_p("INPUT: us [reason] [status] ")
+        cprint.notice_p("reason : [1:模拟急停事件，2:模拟设备故障]")
+        cprint.notice_p("急停status : [0:离开急停状态，1:进入急停状态]")
+        cprint.notice_p("设备故障status : [0：正常 1：过压 2：欠压 3：过流 4：过温 5：漏电]")
+
+    def do_us(self,arg, opt=None):
+        args = arg.split()
+        if len(args) != 2 or args[0] not in {"1", "2"}:
+            return self.help_us()
+        if (int(args[0]) == 1 and args[1] not in {'0','1'}) \
+                or (int(args[0]) == 2 and args[1] not in {'0','1','2','3','4','5'}):
+                return self.help_us()
+        reason = int(args[0])
+        status = int(args[1])
+        if reason == 2 and status != 0:
+            status = 2 ** (status-1)
+        self.sim_objs[0].set_abnormal_status(reason,status)
+
+    def help_ic(self):
+        cprint.notice_p("模拟IC卡充电")
+        cprint.notice_p("INPUT: ic [status] ")
+        cprint.notice_p("status : [0:停止充电，1:开始充电]")
+
+    def do_ic(self,arg,opt=None):
+        args = arg.split()
+        if len(args) != 1 or args[0] not in ["0", "1"]:
+            return self.help_ic()
+        self.sim_objs[0].send_ic_charging_req(int(args[0]))
+
+
 
 def sys_init():
     # sys log init
@@ -202,7 +256,6 @@ def sys_init():
     arg_handle.run()
     LOG.info("Let's go!!!")
 
-
 def sys_cleanup():
     LOG.info("Goodbye!!!")
 
@@ -214,6 +267,8 @@ def delallLog(doit = True):
             if( file.find(".log") != -1):
                 os.remove(file)
                 print("file:%s is removed" % (file,))
+
+
 
 if __name__ == '__main__':
     delallLog()
