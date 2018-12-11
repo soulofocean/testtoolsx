@@ -24,66 +24,66 @@ class RequestHandler(BaseHTTPRequestHandler):
 
 def do_POST(self):
 
-length=int(self.headers['Content-Length'])
+    length=int(self.headers['Content-Length'])
 
-post_data = urlparse.parse_qs(self.rfile.read(int(self.headers['content-length'])))#获取内容
+    post_data = urlparse.parse_qs(self.rfile.read(int(self.headers['content-length'])))#获取内容
 
-print(str(post_data['op'])[2:-2]) #获取name为op的值
+    print(str(post_data['op'])[2:-2]) #获取name为op的值
 
-log(post_data,self.client_address[0]) #收集日志
+    log(post_data,self.client_address[0]) #收集日志
 
-self.send_response(200)
+    self.send_response(200)
 
-self.send_header("Content-type","text/html")
+    self.send_header("Content-type","text/html")
 
-self.end_headers()
+    self.end_headers()
 
-defdo_action(self, path, args):
+def do_action(self, path, args):
 
-self.outputtxt(path + args)
+    self.outputtxt(path + args)
 
-defoutputtxt(self, content):
+def outputtxt(self, content):
 
-#指定返回编码
+    #指定返回编码
 
-enc ="UTF-8"
+    enc ="UTF-8"
 
-content = content.encode(enc)
+    content = content.encode(enc)
 
-f = io.BytesIO()
+    f = io.BytesIO()
 
-f.write(content)
+    f.write(content)
 
-f.seek(0)
+    f.seek(0)
 
-self.send_response(200)
+    self.send_response(200)
 
-self.send_header("Content-type","text/html; charset=%s"% enc)
+    self.send_header("Content-type","text/html; charset=%s"% enc)
 
-self.send_header("Content-Length",str(len(content)))
+    self.send_header("Content-Length",str(len(content)))
 
-self.end_headers()
+    self.end_headers()
 
-shutil.copyfileobj(f,self.wfile)
+    shutil.copyfileobj(f,self.wfile)
 
-deflog(data,ip):
+def log(data,ip):
 
-path_temp = os.path.split(os.path.realpath(__file__))[0];
+    path_temp = os.path.split(os.path.realpath(__file__))[0];
 
-current_path = path_temp.replace("\\","/");
+    current_path = path_temp.replace("\\","/");
 
-filename = current_path +"/shubohui.log";
+    filename = current_path +"/shubohui.log";
 
-f =open(filename,'a');
+    f =open(filename,'a');
 
-timestamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()));
+    timestamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()));
 
-f.write(timestamp +" IP : "+ip+":"+str(8765)+" | Parameter Body :"+str(data) +"\r\n");
+    f.write(timestamp +" IP : "+ip+":"+str(8765)+" | Parameter Body :"+str(data) +"\r\n");
 
-f.close();
+    f.close();
 
-addr = ('',port)#随时接收任何端口的请求
+    addr = ('',port)#随时接收任何端口的请求
 
-server = HTTPServer(addr,RequestHandler)
+    server = HTTPServer(addr,RequestHandler)
 
-server.serve_forever()
+    server.serve_forever()
