@@ -21,18 +21,18 @@ Attribute_initialization = {
     "mac_list": ['59:88:88:88:' + re.sub(r'^(?P<xx>\d\d)', "\g<xx>:", str(i)) for i in range(1000, 4000)],
     "DeviceFacturer": 1008,
     "DeviceType": 2025,
-    #额定电压
-    "RatedV":220.0,
+    #额定电压2200代表220V
+    "RatedV":2200,
     #电压波动范围，正负15%，超过或者不足会触发过压/欠压保护和相应事件上报
     "RatedFloatV":0.15,
     #当前最大的电流数，和插入的插孔相关，需要和插孔设置联动
     "SwitchMaxI":0,
-    #最小功率充电时候的电流
-    "SwitchMinI":6.000,
+    #最小功率充电时候的电流单位:毫安
+    "SwitchMinI":6000,
     #3孔最大电流，超过会触发过流保护，自动断电
-    "Switch3MaxI":15,
+    "Switch3MaxI":15000,
     #7孔最大电流，超过会触发过流保护，自动断电
-    "Switch7MaxI":32 * 1.1,
+    "Switch7MaxI":32000 * 1.1,
     "comPowerCtlResult": 0,
     "comSetLockResult":0,
     #"subDeviceType": 3010,
@@ -55,13 +55,15 @@ Attribute_initialization = {
     #充电时间，一般采用当前-开始时间进行计算
     "_duarationTime":0,
     #开始充电电量，感觉类似于里程表的东西，模拟器中暂不实现，暂定恒定为0，若要实现，需要增加并保存
-    "_startQuantity":0.00,
-    #本次充电已经使用的充电电量
-    "_usedQuantity":0.00,
-    #记录当前输出电压
-    "_voltageOut":220.0,
-    #记录当前电流
-    "_currentI":0.000,
+    "_startQuantity":0,
+    #本次充电已经使用的充电电量2代表0.02kwh
+    "_usedQuantity":0,
+    #跟_usedQuantity一样，不过不四舍五入，防止出现电流过小导致10秒内上报0+0=0的问题
+    "_usedQuantity2":0,
+    #记录当前输出电压，2200=220V
+    "_voltageOut":2200,
+    #记录当前电流，单位mA
+    "_currentI":0,
     #记录当前功率，目前采用电压*电流计算
     "_power":0.0,
     "_switch3Status":0,
@@ -268,7 +270,7 @@ COM_REQ_REAL_DATA = {
             {
                 "type": 0,
                 "isCharging": "##self._isCharging##",
-                "orderNumber":"##_orderNumber##",
+                "orderNumber":"##self._orderNumber##",
                 "startTime":"##self._startTime##",
                 "currentTime":"##self._currentTime##",
                 "duarationTime":"##self._duarationTime##",
@@ -424,14 +426,14 @@ COM_UPLOAD_EVENT = {
 u'''事件上传：8.4.3 开始充电结果上报'''
 COM_UPLOAD_START_RESULT = {
     "send_msg": {
-        "Command": 0,
+        "Command": 'COM_UPLOAD_START_RESULT',
         "Data": [
                 {
                     "result": "##self._result##",
-                    "switchStatus":"##_switchStatus##",
-                    "startTime":"##_startTime##",
-                    "power":"##_power##",
-                    "orderNumber":"##_orderNumber##"
+                    "switchStatus":"##self._switchStatus##",
+                    "startTime":"##self._startTime##",
+                    "power":"##self._power##",
+                    "orderNumber":"##self._orderNumber##"
                 }
         ]
     }
@@ -444,8 +446,8 @@ COM_UPLOAD_STOP_RESULT = {
         "Data": [
                 {
                     "result": "##self._result##",
-                    "endTime":"##_endTime##",
-                    "orderNumber":"##_orderNumber##",
+                    "endTime":"##self._endTime##",
+                    "orderNumber":"##self._orderNumber##",
                 }
         ]
     }
@@ -458,9 +460,9 @@ COM_UPLOAD_STOP_EVENT = {
         "Data": [
                 {
                     "reason": "##self._reason##",
-                    "startTime":"##_startTime##",
-                    "endTime":"##_endTime##",
-                    "orderNumber":"##_orderNumber##"
+                    "startTime":"##self._startTime##",
+                    "endTime":"##self._endTime##",
+                    "orderNumber":"##self._orderNumber##"
                 }
         ]
     }
@@ -474,14 +476,14 @@ COM_IC_CARD_REQ_CHARGE = {
                 {
                     #_icType=0表示停止充电，需要orderNumber
                     "type": "##self._icType##",
-                    "startTime":"##_startTime##",
-                    "endTime":"##_endTime##",
-                    "orderNumber":"##_orderNumber##"
+                    "startTime":"##self._startTime##",
+                    "endTime":"##self._endTime##",
+                    "orderNumber":"##self._orderNumber##"
                 },
                 {
                     #_icType=1表示开始充电，不需要orderNumber和endTime
                     "type": "##self._icType##",
-                    "startTime": "##_startTime##"
+                    "startTime": "##self._startTime##"
                 }
         ]
     },

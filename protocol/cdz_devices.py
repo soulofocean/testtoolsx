@@ -43,6 +43,8 @@ class SwitchStatus:
     Only3 = 4
     # 只有7插着
     Only7 = 5
+    # 对于7来说，车没有响应
+    Only7_CarNoResponse = 6
 
 class DeviceStatus:
     '''设备状态'''
@@ -59,6 +61,7 @@ class ReasonType:
 
 class CDZ_Dev(BaseSim):
     type_lock = threading.Lock()
+    charging_lock = threading.Lock()
 
     def __init__(self, logger, config_file, server_addr, N=0, tt=None, encrypt_flag=0, self_addr=None):
         super(CDZ_Dev, self).__init__(logger)
@@ -140,16 +143,23 @@ class CDZ_Dev(BaseSim):
     def handle_var_before_report(self, isEndReport = False):
         '''用于处理上报之前的一些变量变化逻辑，主要是用电量的计算与刷新和时间的保存和其他一些变量联动逻辑
         isEndReport为TRUE意为此次上报为停止充电后的最后一次上报，电流和功率字段需要特殊处理'''
-        realTime = datetime.datetime.now()
+        realTimeStr = self.sim_config.getDateStr()
+        realTime = self.sim_config.getDateFromStr(realTimeStr)
+        self.LOG.warn("realTime {}".format(realTime))
         # 此处为了防止在统计过程中由于currentTime被SETTIME或者别的原因干扰，新建立一个字段保存上次计算的间隔
         lastCalTime = self.sim_config.getDateFromStr(self.get_item("_lastReportTime"))
-        ts = self.sim_config.getTimeSpanS(lastCalTime, realTime)
-        currentP = self.get_item("_voltageOut") * self.get_item("_currentI")
-        # 单位是瓦特
-        self.set_item("_power", round(currentP, 1))
-        # 单位是千瓦时（KWH）
-        usedQ = ts * currentP / 3600000
-        self.set_item("_usedQuantity", self.get_item("_usedQuantity") + round(usedQ, 2))
+        self.LOG.warn("lastCalTime {}".format(lastCalTime))
+        ts = self.sim_config.getTimeSpanS(realTime, lastCalTime)
+        self.LOG.warn("ts {}".format(ts))
+        currentP = self.get_item("_voltageOut") * self.get_item("_currentI") / 1000
+        # 单位是0.1瓦特
+        self.set_item("_power", round(currentP))
+        # 单位是0.01千瓦时（KWH）
+        usedQ = ts * currentP / 360000
+        self.set_item("_usedQuantity2", self.get_item("_usedQuantity2") + usedQ)
+        #self.set_item("_usedQuantity", self.get_item("_usedQuantity") + round(usedQ))
+        #上报的时候将真实的取整即可
+        self.set_item("_usedQuantity", round(self.get_item("_usedQuantity2")))
         self.set_item("_currentTime", realTime.strftime(self.sim_config.timeStrFormate))
         # 此处保存上一次上报的时间，作为下一次上报计算新增变量的依据
         self.set_item("_lastReportTime", realTime.strftime(self.sim_config.timeStrFormate))
@@ -228,7 +238,7 @@ class CDZ_Dev(BaseSim):
         '''获取充电状态，TRUE：正在充电，FALSE：未在充电'''
         return self.get_item("_isCharging") == 1
 
-    @common_APIs.need_add_lock
+    @common_APIs.need_add_lock(charging_lock)
     def set_charging_status(self,status:int):
         """设置充电状态，0：停止充电 1：开始充电"""
         self.set_item("_isCharging",int(status))
@@ -269,11 +279,12 @@ class CDZ_Dev(BaseSim):
     def handle_start_charge(self):
         '''开始充电的联动逻辑，函数会发送ACK'''
         msg_cmd = "COM_START_CHARGE"
-        rsp_msg = self.get_rsp_msg(msg_cmd)
+        rsp_msg = json.dumps(self.get_rsp_msg(msg_cmd))
         tp = int(self.get_item("_targetPower"))
         # sw3status = self.get_item("_switch3Status")
         # sw7status = self.get_item("_switch7Status")
         swStatus = self.getSwitchStatus()
+        self.LOG.debug("switch_status:{}".format(swStatus))
         tI = 0
         # 预约充电需要加电子锁并上报,目前逻辑为预约前必须先插上插座
         if tp == 0:
@@ -283,16 +294,18 @@ class CDZ_Dev(BaseSim):
                 self.send_charging_report_onetime(ReportType.LOCK7_CHANGE)
         elif tp == -1:
             # 为-1时意思以6A电流充电
-            tI = 6
-            self.set_item("_currentI", self.get_item("SwitchMinI"))
+            tI = self.get_item("SwitchMinI")
+            self.set_item("_currentI", tI)
         elif tp == -2:
             # 为-2时意思用最大电流充电,如果都不插枪此处为0，因为SwitchMaxI为0
             tI = self.get_item("SwitchMaxI")
             self.set_item("_currentI", tI)
         else:
-            tI = tp / self.get_item("_voltageOut")
-            self.set_item("_currentI", round(tI, 3))
+            tI = tp * 1000 / self.get_item("_voltageOut")
+            self.set_item("_currentI", round(tI))
         realTimeStr = self.sim_config.getDateStr()
+        self.set_item("_usedQuantity",0)
+        self.set_item("_usedQuantity2",0)
         self.set_item("_startTime", realTimeStr)
         self.set_item("_currentTime", realTimeStr)
         self.set_item("_lastReportTime", realTimeStr)
@@ -300,7 +313,7 @@ class CDZ_Dev(BaseSim):
         self.sdk_obj.add_send_data(self.sdk_obj.msg_build(rsp_msg))
         self.update_msgst(msg_cmd, 'rsp')
         # 开始处理开始充电结果消息的发送
-        if swStatus in {SwitchStatus.Both3And7, SwitchStatus.Neither3Nor7, SwitchStatus.Only7_Unstable} \
+        if swStatus not in {SwitchStatus.Only3, SwitchStatus.Only7} \
                 or tI > self.get_item("SwitchMaxI"):
             self.set_item("_result", 1)
         else:
@@ -310,16 +323,17 @@ class CDZ_Dev(BaseSim):
             elif swStatus == SwitchStatus.Only7:
                 if self.try_set_item("_switch7Status", 4):
                     self.send_charging_report_onetime(ReportType.SWITCH7_CHANGE)
-            realPower = tI * self.get_item("_voltageOut")
-            self.set_item("_power", round(realPower, 1))
-            self.send_msg(self.get_upload_start_result(), ack=b'\x00')
-            self.set_item("_isCharging", 1)
+            realPower = tI * self.get_item("_voltageOut") / 1000
+            self.set_item("_power", round(realPower))
+        self.send_msg(self.get_upload_start_result(), ack=b'\x00')
+        if self.get_item("_result")==0:
+            self.set_charging_status(1)
             self.send_charging_report_by_thread()
 
     def handle_stop_charge(self):
         '''停止充电的联动逻辑,函数会发送ACK'''
         msg_cmd = "COM_STOP_CHARGE"
-        rsp_msg = self.get_rsp_msg(msg_cmd)
+        rsp_msg = json.dumps(self.get_rsp_msg(msg_cmd))
         swStatus = self.getSwitchStatus()
         self.set_endTime_to_currentTime()
         # 先把此消息的回复发出去
@@ -392,8 +406,8 @@ class CDZ_Dev(BaseSim):
                 return SwitchStatus.Only3
         elif sw7status > 0:
             # only 7
-            if (sw7status == 2):
-                    # 2表示没连接车，假设这时候就是所谓的7没插好
+            if (sw7status == 1):
+                    # 1表示没连接车，假设这时候就是所谓的7没插好
                     return SwitchStatus.Only7_Unstable
             return SwitchStatus.Only7
         else:
@@ -435,8 +449,8 @@ class CDZ_Dev(BaseSim):
                         elif swStatus == SwitchStatus.Only7:
                             if self.try_set_item("_switch7Status", 4):
                                 self.send_charging_report_onetime(ReportType.SWITCH7_CHANGE)
-                        realPower = tI * self.get_item("_voltageOut")
-                        self.set_item("_power", round(realPower, 1))
+                        realPower = tI * self.get_item("_voltageOut") / 1000
+                        self.set_item("_power", round(realPower))
                         self.send_msg(self.get_upload_start_result(), ack=b'\x00')
                         self.set_item("_isCharging", 1)
                         self.send_charging_report_by_thread()
