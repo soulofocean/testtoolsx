@@ -53,9 +53,9 @@ class ArgHandle():
             '-p', '--server-port',
             dest='server_port',
             action='store',
-            default=2011,
+            default=2012,
             type=int,
-            help='Specify TCP server port, default is 20011',
+            help='Specify TCP server port, default is 2012',
         )
         parser.add_argument(
             '-i', '--server-IP',
@@ -326,7 +326,7 @@ if __name__ == '__main__':
 
     sims = []
     for i in range(arg_handle.get_args('device_count')):
-        dev_LOG = MyLogger('dev_cdz_sim_%d.log' % (
+        dev_LOG = MyLogger('dev_db_sim_%d.log' % (
             i), clevel=log_level, flevel=log_level, fenable=True)
 
         if ipv4_list:

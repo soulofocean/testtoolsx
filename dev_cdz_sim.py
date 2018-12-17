@@ -55,7 +55,7 @@ class ArgHandle():
             action='store',
             default=2011,
             type=int,
-            help='Specify TCP server port, default is 20011',
+            help='Specify TCP server port, default is 2011',
         )
         parser.add_argument(
             '-i', '--server-IP',
