@@ -15,12 +15,12 @@ try:
 except:
     import Queue
 
-class CDZ_Protocol(communication_base):
+class DB_Protocol(communication_base):
     def __init__(self, logger, addr, self_addr=None):
         self.queue_in = Queue.Queue()
         self.queue_out = Queue.Queue()
-        super(CDZ_Protocol, self).__init__(logger, self.queue_in, self.queue_out,
-                                           left_data=b'', min_length=32)
+        super(DB_Protocol, self).__init__(logger, self.queue_in, self.queue_out,
+                                          left_data=b'', min_length=32)
         self.addr = addr
         self.name = 'Device controler'
         self.connection = my_socket.MyClient(logger, addr, self_addr)
