@@ -15,7 +15,7 @@ from cmd import Cmd
 
 import APIs.common_APIs as common_APIs
 from basic.log_tool import MyLogger
-from protocol.cdz_devices import CDZ_Dev,ReportType
+from protocol.db_devices import CDZ_Dev,ReportType
 from basic.cprint import cprint
 
 
@@ -119,6 +119,7 @@ class MyCmd(Cmd):
         self.prompt = "CDZ>"
         self.sim_objs = sim_objs
         self.LOG = logger
+        self.ControlIndex = -1
 
     def help_log(self):
         cprint.notice_p(
@@ -207,7 +208,13 @@ class MyCmd(Cmd):
             return self.help_c()
         if (args[0]=="3" and args[1] not in ("0","1")) or (args[0]=="7" and args[1] not in ("0","1","2")):
             return self.help_c()
-        self.sim_objs[0].switch_connect(int(args[0]),int(args[1]))
+        if not sims:
+            return self.do_show()
+        if self.ControlIndex == -1:
+            for s in sims:
+                s.switch_connect(int(args[0]),int(args[1]))
+        else:
+            self.sim_objs[self.ControlIndex].switch_connect(int(args[0]),int(args[1]))
 
     def help_us(self):
         cprint.notice_p("模拟各种异常事件")
@@ -227,7 +234,13 @@ class MyCmd(Cmd):
         status = int(args[1])
         if reason == 2 and status != 0:
             status = 2 ** (status-1)
-        self.sim_objs[0].set_abnormal_status(reason,status)
+        if not sims:
+            return self.do_show()
+        if self.ControlIndex == -1:
+            for s in sims:
+                s.set_abnormal_status(reason,status)
+        else:
+            self.sim_objs[self.ControlIndex].set_abnormal_status(reason,status)
 
     def help_ic(self):
         cprint.notice_p("模拟IC卡充电")
@@ -238,8 +251,40 @@ class MyCmd(Cmd):
         args = arg.split()
         if len(args) != 1 or args[0] not in ["0", "1"]:
             return self.help_ic()
-        self.sim_objs[0].send_ic_charging_req(int(args[0]))
+        if self.ControlIndex == -1:
+            for s in sims:
+                s.send_ic_charging_req(int(args[0]))
+        else:
+            self.sim_objs[self.ControlIndex].send_ic_charging_req(int(args[0]))
 
+    def help_ctl(self):
+        cprint.notice_p("设置要操作的设备序列号")
+        cprint.notice_p("ctl [index]")
+        cprint.notice_p("index默认为-1，意为对所有设备执行同一操作")
+        cprint.notice_p("使用show命令查看当前有的设备序列号和DEV ID以及当前操控的设备序列号")
+
+    def do_ctl(self, arg, opt=None):
+        args = arg.split()
+        if len(args) != 1 and not args[0].isdigit():
+            return self.help_us()
+        val = int(args[0])
+        if(val > len(sims)-1):
+            return self.do_show()
+        devid = "ALL"
+        if(val != -1):
+            devid = sims[val].get_item("_deviceID")
+        self.ControlIndex = val
+        cprint.notice_p("set ctl index to {0} (devid:{1})".format(self.ControlIndex,devid))
+
+    def help_show(self):
+        cprint.notice_p("获取当前所有ID和序列号")
+
+    def do_show(self):
+        if not sims:
+            return cprint.notice_p("Not any devices")
+        cprint.notice_p("Dev List")
+        for index in range(len(sims)):
+            cprint.notice_p("[index:{0}] [devid:{1}]".format(self.ControlIndex, sims[index].get_item("_deviceID")))
 
 
 def sys_init():
