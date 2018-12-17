@@ -15,7 +15,7 @@ from cmd import Cmd
 
 import APIs.common_APIs as common_APIs
 from basic.log_tool import MyLogger
-from protocol.db_devices import CDZ_Dev,ReportType
+from protocol.cdz_devices import CDZ_Dev,ReportType
 from basic.cprint import cprint
 
 
