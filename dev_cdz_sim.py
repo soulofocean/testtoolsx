@@ -61,7 +61,7 @@ class ArgHandle():
             '-i', '--server-IP',
             dest='server_IP',
             action='store',
-            default='10.101.72.100',
+            default='10.101.72.29',
             help='Specify TCP server IP address',
         )
         parser.add_argument(
