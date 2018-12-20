@@ -75,7 +75,7 @@ class ArgHandle():
             '-c', '--count',
             dest='device_count',
             action='store',
-            default=1,
+            default=20,
             type=int,
             help='Specify how many devices to start, default is only 1',
         )
@@ -279,12 +279,13 @@ class MyCmd(Cmd):
     def help_show(self):
         cprint.notice_p("获取当前所有ID和序列号")
 
-    def do_show(self):
+    def do_show(self, arg, opt=None):
         if not sims:
             return cprint.notice_p("Not any devices")
         cprint.notice_p("Dev List")
+        cprint.notice_p("Current Control ID:{0}".format(self.ControlIndex))
         for index in range(len(sims)):
-            cprint.notice_p("[index:{0}] [devid:{1}]".format(self.ControlIndex, sims[index].get_item("_deviceID")))
+            cprint.notice_p("[index:{0}] [devid:{1}]".format(index, sims[index].get_item("_deviceID")))
 
 
 def sys_init():
@@ -314,20 +315,20 @@ def delallLog(doit = True):
                 print("file:%s is removed" % (file,))
 
 
-
+import time
 if __name__ == '__main__':
     delallLog()
     sys_init()
     global ipv4_list
     if arg_handle.get_args('device_count') > 1:
-        log_level = logging.DEBUG
+        log_level = logging.WARN
     else:
-        log_level = logging.DEBUG
+        log_level = logging.WARN
 
     sims = []
     for i in range(arg_handle.get_args('device_count')):
         dev_LOG = MyLogger('dev_cdz_sim_%d.log' % (
-            i), clevel=log_level, flevel=log_level, fenable=True)
+            i), clevel=log_level, rlevel=log_level, fenable=True)
 
         if ipv4_list:
             id = i % len(ipv4_list)
@@ -346,6 +347,7 @@ if __name__ == '__main__':
             sim.set_item('_ip', self_addr[0])
         sim.run_forever()
         sims.append(sim)
+        #time.sleep(1)
 
     if True:
         # signal.signal(signal.SIGINT, lambda signal,
