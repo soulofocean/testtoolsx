@@ -33,6 +33,8 @@ def file_lock(open_file):
 def file_unlock(open_file):
     return fcntl.flock(open_file, fcntl.LOCK_UN)
 '''
+file_lock = threading.Lock()
+
 
 def GetQrCodeByUrlAndSn(url,sn,imgFile='qrcode.png',snTtf='arial2.ttf',snSize=20,showImg=True):
     '''将URL和SN生成二维码保存到imgFile中，SN字体采用snTtf，大小为snSize，showImg为TRUE显示生成的图片'''
@@ -48,14 +50,14 @@ def GetQrCodeByUrlAndSn(url,sn,imgFile='qrcode.png',snTtf='arial2.ttf',snSize=20
         #img.show()
         os.system(imgFile)
 
-def ShowQrCodeImage(url, sn, imgFile,snTtf='arial.ttf',snSize=20):
+def ShowQrCodeImage(url, sn, imgFile,snTtf='arial.ttf',snSize=20,showImg =True):
     '''如果imgFile存在则直接打开，否则用URL和SN以及字体文件和字体大小调用GetQrCodeByUrlAndSn生成图片并打开'''
-    if os.path.isfile(imgFile) and os.access(imgFile, os.R_OK):
+    if showImg and os.path.isfile(imgFile) and os.access(imgFile, os.R_OK):
         os.system(imgFile)
         #img = Image.open(imgFile)
         #img.show()
     else:
-        GetQrCodeByUrlAndSn(url,sn,imgFile,snTtf,snSize,True)
+        GetQrCodeByUrlAndSn(url,sn,imgFile,snTtf,snSize,showImg)
 
 def save_ini_file(filename, section, **kw):
     '''保存INI文件到filename中section，加上KW键值对'''
