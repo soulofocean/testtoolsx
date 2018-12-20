@@ -114,14 +114,15 @@ class CDZ_Dev(BaseSim):
         for th in thread_ids:
             th.setDaemon(True)
             th.start()
+        time.sleep(self.reg_dev_relay_s)
         self.to_register_dev()
 
     def to_register_dev(self):
         if self.dev_register:
-            self.LOG.info(common_APIs.chinese_show("设备已经注册"))
+            self.LOG.warn(common_APIs.chinese_show("设备已经注册[{}]".format(self._deviceID)))
         else:
             time.sleep(self.reg_dev_relay_s)  # wait the send_data_loop thread to start
-            self.LOG.info(common_APIs.chinese_show("发送设备注册"))
+            self.LOG.info(common_APIs.chinese_show("发送设备注册[{}]".format(self._deviceID)))
             self.send_msg(json.dumps(
                 self.get_send_msg('COM_DEV_REGISTER')), ack=b'\x00')
 
@@ -425,11 +426,11 @@ class CDZ_Dev(BaseSim):
                     # decrypt
                     if self.encrypt_flag:
                         self.add_item('_encrypt_key', msg['Data'][0]['aeskey'])
-                    self.LOG.warn(common_APIs.chinese_show("设备已经注册"))
+                    self.LOG.warn(common_APIs.chinese_show("设备注册成功[{}]".format(self._deviceID)))
                     return None
                 else:
                     self.dev_register = False
-                    self.LOG.warn(common_APIs.chinese_show("设备注册失败"))
+                    self.LOG.warn(common_APIs.chinese_show("设备注册失败[{}]".format(self._deviceID)))
                     return None
             elif msg['Command'] == 'COM_IC_CARD_REQ_CHARGE':
                 if msg['Result'] == 0:
@@ -477,10 +478,10 @@ class CDZ_Dev(BaseSim):
             if msg['Command'] == 'COM_SET_QR_CODE':
                 # 如果当前有打开图片，先关掉
                 os.system("taskkill /f /t /im dllhost.exe")
-                common_APIs.GetQrCodeByUrlAndSn(self.get_item("_url"),
-                                                self.get_item("_sn"), imgFile=self.get_item("_qcodeFile"))
                 common_APIs.save_ini_file(self.iniFile, self._deviceID,
                                           url=self.get_item("_url"), sn=self.get_item("_sn"))
+                common_APIs.GetQrCodeByUrlAndSn(self.get_item("_url"),
+                                                self.get_item("_sn"), imgFile=self.get_item("_qcodeFile"))
             elif msg['Command'] == 'COM_START_CHARGE':
                 self.handle_start_charge()
                 # handle_start_charge已经发过了ACK，这里不需要返回再发了，所以返回None
@@ -523,13 +524,23 @@ class CDZ_Dev(BaseSim):
                 # if(isinstance(tmp_msg,list)):
                 # tmp_msg = tmp_msg[0]
                 # 处理Data对应的是List而不是Dictionary，如果返回的就是Dict，set_item配置文件就不需要加.0
+                needSet = True
                 for i in msg_param_list[1:]:
                     if re.match(r'\d+', i):
                         i = int(i)
                     else:
                         pass
+                    if isinstance(tmp_msg,list) and i>=len(tmp_msg):
+                        needSet = False
+                        self.LOG.error("tmp_msg[{0}] out of range:i={1}".format(tmp_msg,i))
+                        break
+                    if isinstance(tmp_msg,dict) and i not in tmp_msg:
+                        needSet = False
+                        self.LOG.info("key:[{0}] not in tmp_msg".format(i))
+                        break
                     tmp_msg = tmp_msg[i]
-                self.set_item(item, tmp_msg)
+                if needSet:
+                    self.set_item(item, tmp_msg)
 
     def attribute_initialization(self):
         attribute_params_dict = getattr(
@@ -551,7 +562,7 @@ class CDZ_Dev(BaseSim):
         if "url" in qcodeDict and "sn" in qcodeDict:
             self.set_item("_sn", qcodeDict["sn"])
             self.set_item("_url", qcodeDict["url"])
-            common_APIs.ShowQrCodeImage(self._url, self._sn, self._qcodeFile)
+            common_APIs.ShowQrCodeImage(self.get_item("_url"), self.get_item("_sn"), self._qcodeFile,showImg=False)
 
     def set_abnormal_status(self,reason:int, status:int = 1):
         #急停状态无改变则不触发任何事情
