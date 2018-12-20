@@ -29,9 +29,9 @@ Attribute_initialization = {
     "SwitchMaxI":0,
     #最小功率充电时候的电流单位:毫安
     "SwitchMinI":6000,
-    #3孔最大电流，超过会触发过流保护，自动断电
-    "Switch3MaxI":15000,
-    #7孔最大电流，超过会触发过流保护，自动断电
+    #3孔最大电流，超过会触发过流保护，自动断电,标准电流为16A
+    "Switch3MaxI":18000,
+    #7孔最大电流，超过会触发过流保护，自动断电，标准电流为32A
     "Switch7MaxI":32000 * 1.1,
     "comPowerCtlResult": 0,
     "comSetLockResult":0,
@@ -423,14 +423,14 @@ COM_UPLOAD_EVENT = {
     }
 }
 
-u'''事件上传：8.4.3 开始充电结果上报'''
+u'''事件上传：8.4.4 开始充电结果上报'''
 COM_UPLOAD_START_RESULT = {
     "send_msg": {
         "Command": 'COM_UPLOAD_START_RESULT',
         "Data": [
                 {
                     "result": "##self._result##",
-                    "switchStatus":"##self._switchStatus##",
+                    "reason":"##self._switchStatus##",
                     "startTime":"##self._startTime##",
                     "power":"##self._power##",
                     "orderNumber":"##self._orderNumber##"
@@ -439,7 +439,7 @@ COM_UPLOAD_START_RESULT = {
     }
 }
 
-u'''事件上传：8.4.4 停止充电结果上报'''
+u'''事件上传：8.4.5 停止充电结果上报'''
 COM_UPLOAD_STOP_RESULT = {
     "send_msg": {
         "Command": 'COM_UPLOAD_STOP_RESULT',
@@ -453,7 +453,7 @@ COM_UPLOAD_STOP_RESULT = {
     }
 }
 
-u'''事件上传：8.4.5 停止充电事件上报'''
+u'''事件上传：8.4.6 停止充电事件上报'''
 COM_UPLOAD_STOP_EVENT = {
     "send_msg": {
         "Command": 'COM_UPLOAD_STOP_EVENT',
@@ -468,7 +468,7 @@ COM_UPLOAD_STOP_EVENT = {
     }
 }
 
-u'''事件上传：8.4.6 IC卡开始/停止充电'''
+u'''事件上传：8.4.7 IC卡开始/停止充电'''
 COM_IC_CARD_REQ_CHARGE = {
     "send_msg": {
         "Command": 'COM_IC_CARD_REQ_CHARGE',
