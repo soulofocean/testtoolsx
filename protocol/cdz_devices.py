@@ -75,6 +75,8 @@ class CDZ_Dev(BaseSim):
         self.iniFile = "CDZ.ini"
         self.attribute_initialization()
         self.sdk_obj = SDK(logger=logger, addr=server_addr, self_addr=self_addr)
+        if self_addr!=None:
+            self._ip = self_addr
         self.sdk_obj.sim_obj = self
         self.sdk_obj.device_id = self._deviceID
         self.need_stop = False
@@ -398,22 +400,26 @@ class CDZ_Dev(BaseSim):
     def getSwitchStatus(self):
         sw3status = self.get_item("_switch3Status")
         sw7status = self.get_item("_switch7Status")
+        status = SwitchStatus.Neither3Nor7
         if sw3status > 0:
             if sw7status > 0:
                 # 3 7 都插抢
-                return SwitchStatus.Both3And7
+                status = SwitchStatus.Both3And7
             else:
                 # 仅3插抢
-                return SwitchStatus.Only3
+                status = SwitchStatus.Only3
         elif sw7status > 0:
             # only 7
             if (sw7status == 1):
-                    # 1表示没连接车，假设这时候就是所谓的7没插好
-                    return SwitchStatus.Only7_Unstable
-            return SwitchStatus.Only7
+                # 1表示没连接车，假设这时候就是所谓的7没插好
+                status = SwitchStatus.Only7_Unstable
+            else:
+                status = SwitchStatus.Only7
         else:
             # no one
-            return SwitchStatus.Neither3Nor7
+            status = SwitchStatus.Neither3Nor7
+        self.set_item("_switchStatus",status)
+        return status
 
     #endregion
 
@@ -477,7 +483,7 @@ class CDZ_Dev(BaseSim):
             self.set_items(msg['Command'], msg)
             if msg['Command'] == 'COM_SET_QR_CODE':
                 # 如果当前有打开图片，先关掉
-                os.system("taskkill /f /t /im dllhost.exe")
+                # os.system("taskkill /f /t /im dllhost.exe")
                 common_APIs.save_ini_file(self.iniFile, self._deviceID,
                                           url=self.get_item("_url"), sn=self.get_item("_sn"))
                 common_APIs.GetQrCodeByUrlAndSn(self.get_item("_url"),
