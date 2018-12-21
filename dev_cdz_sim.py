@@ -75,7 +75,7 @@ class ArgHandle():
             '-c', '--count',
             dest='device_count',
             action='store',
-            default=6,
+            default=4,
             type=int,
             help='Specify how many devices to start, default is only 1',
         )
@@ -310,7 +310,7 @@ def delallLog(doit = True):
         files = os.listdir(os.getcwd())
         print(files)
         for file in files:
-            if( file.find(".log") != -1):
+            if file.find(".log") != -1 and file.find("dev_cdz_sim") != -1:
                 os.remove(file)
                 print("file:%s is removed" % (file,))
 
@@ -323,7 +323,7 @@ if __name__ == '__main__':
     if arg_handle.get_args('device_count') > 1:
         log_level = logging.WARN
     else:
-        log_level = logging.WARN
+        log_level = logging.DEBUG
 
     sims = []
     for i in range(arg_handle.get_args('device_count')):
