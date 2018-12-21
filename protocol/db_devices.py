@@ -446,7 +446,7 @@ class DB_Dev(BaseSim):
         datadict["aI"]=1000
         datadict["bI"] = 1500
         datadict["cI"] = 2000
-        datadict["tPower"] = round((datadict["aI"]+datadict["bI"]+datadict["cI"])*2200e-4)
+        datadict["tPower"] = round((datadict["aI"]+datadict["bI"]+datadict["cI"])*2200e-3)
         return datadict
 
     def get_msg_by_command(self, command):
