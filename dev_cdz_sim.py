@@ -75,7 +75,7 @@ class ArgHandle():
             '-c', '--count',
             dest='device_count',
             action='store',
-            default=20,
+            default=6,
             type=int,
             help='Specify how many devices to start, default is only 1',
         )
