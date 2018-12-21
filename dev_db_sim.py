@@ -309,7 +309,7 @@ def delallLog(doit = True):
         files = os.listdir(os.getcwd())
         print(files)
         for file in files:
-            if( file.find(".log") != -1):
+            if file.find(".log") != -1 and file.find("dev_db_sim") !=-1 :
                 os.remove(file)
                 print("file:%s is removed" % (file,))
 
@@ -320,7 +320,7 @@ if __name__ == '__main__':
     sys_init()
     global ipv4_list
     if arg_handle.get_args('device_count') > 1:
-        log_level = logging.DEBUG
+        log_level = logging.WARN
     else:
         log_level = logging.DEBUG
 
