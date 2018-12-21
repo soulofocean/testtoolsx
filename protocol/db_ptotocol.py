@@ -5,8 +5,25 @@ __title__ = ''
 __author__ = 'ZengXu'
 __mtime__ = '2018-10-9'
 """
-import connections.my_socket as my_socket
+import binascii
+import datetime
+import json
+import logging
+import os
+import random
+import re
+import struct
+import sys
+import threading
+import time
+from abc import ABCMeta, abstractmethod
+from collections import defaultdict
+
 import APIs.common_APIs as common_APIs
+import connections.my_socket as my_socket
+from APIs.common_APIs import crc, crc16, protocol_data_printB
+from APIs.security import AES_CBC_decrypt, AES_CBC_encrypt
+from protocol.protocol_process import communication_base
 import struct
 import json
 from protocol.protocol_process import communication_base
@@ -15,72 +32,182 @@ try:
 except:
     import Queue
 
+
+class MessageType(object):
+    '''处理电表协议的信息'''
+    def __init__(self,msg:bytes):
+        self.addrlen = 6
+        self.prefix_head:bytes = msg[0:0+4]
+        self.frame_head:bytes = msg[4:4+1]
+        self.addr:bytes = msg[5:5+self.addrlen]
+        #msg[11] is frame head, skip
+        self.cmd:int = msg[12]
+        self.data_field_len:int = msg[13]
+        self.data = b''
+        if self.data_field_len >= 4:
+            self.data = msg[14:14+self.data_field_len]
+            self.data = self.__process33h('-')
+        self.cs:int = msg[-2]
+        self.tail:bytes = msg[-1:]
+    def __process33h(self, op='+'):
+        new_data = bytearray(self.data)
+        num = 0x33
+        if self.data :
+            for i in range(0,len(self.data)):
+                if op=='+':
+                    new_data[i] = self.data[i] + num
+                elif op =='-':
+                    new_data[i] = self.data[i] - num
+                else:
+                    raise "invalid option:{}".format(op)
+        return new_data
+    def __calcs(self):
+        '''计算校验码'''
+        msg = bytearray()
+        msg.extend(self.frame_head)
+        msg.extend(self.addr)
+        msg.extend(self.frame_head)
+        msg.extend(self.cmd.to_bytes(1,'big'))
+        msg.extend(self.data_field_len.to_bytes(1,'big'))
+        msg.extend(self.data)
+        #msg2 = self.frame_head + self.frame_head +self.addr+self.cmd+self.data_field_len+self.data
+        r = 0
+        for b in msg:
+            r += int(b)
+            r &= 0xFF
+        return r
+    def __processCmd(self):
+        return self.cmd^0x80
+
+    def set_addr(self,newaddr:str):
+        realaddr = newaddr
+        if len(newaddr) > self.addrlen*2:
+            realaddr = newaddr[:self.addrlen*2]
+        elif len(newaddr)< self.addrlen*2:
+            realaddr = "0"*(self.addrlen*2-len(newaddr)) + newaddr
+        addr = bytearray()
+        for i in range(0, len(realaddr), 2):
+            addr.append(int(realaddr[i:i + 2], 16))
+        self.addr = bytes(addr)
+
+    def set_datafield(self,dataDict:dict):
+        datalen = 3
+        if self.data_field_len >=4:
+            if self.data[0:4] == b'\x00\x00\x03\x02':
+                key = 'tPower'
+            elif self.data[0:4] == b'\x00\x01\x02\x02':
+                key = 'aI'
+            elif self.data[0:4] == b'\x00\x02\x02\x02':
+                key = 'bI'
+            elif self.data[0:4] == b'\x00\x03\x02\x02':
+                key = 'cI'
+            else:
+                return "Not Suport DataField:{}".format(self.getBinStr(self.data[0:4]))
+            if key not in dataDict:
+                return "key:{} not in dict".format(key)
+            dataFormate = "%0{}d".format(datalen*2)
+            dataStr = dataFormate % round(dataDict[key])
+            for i in range(len(dataStr)-2,-2, -2):
+                self.data.append(int(dataStr[i:i + 2], 16))
+            self.data_field_len = datalen  + self.data_field_len
+            return None
+        return "Field len is {}".format(self.data_field_len)
+
+    def buildRspMessage(self):
+        msg = bytearray()
+        msg.extend(self.prefix_head)
+        msg.extend(self.frame_head)
+        msg.extend(self.addr)
+        msg.extend(self.frame_head)
+        self.cmd = self.__processCmd()
+        msg.extend(self.cmd.to_bytes(1,'big'))
+        msg.extend(self.data_field_len.to_bytes(1,'big'))
+        self.data = self.__process33h('+')
+        msg.extend(self.data)
+        self.cs = self.__calcs()
+        msg.extend(self.cs.to_bytes(1,'big'))
+        msg.extend(self.tail)
+        #msg2 = self.prefix_head + self.frame_head+ self.addr+self.frame_head+self.cmd+self.data_field_len+self.data+self.cs+self.tail
+        return bytes(msg)
+
+    def getBinStr(self, data):
+        msg = ''
+        if data:
+            for d in data:
+                msg += "\\x{:02x}".format(d)
+        #print(msg)
+
+
 class DB_Protocol(communication_base):
-    def __init__(self, logger, addr, self_addr=None):
+    def __init__(self, logger, addr, encrypt_flag=0, self_addr=None):
         self.queue_in = Queue.Queue()
         self.queue_out = Queue.Queue()
         super(DB_Protocol, self).__init__(logger, self.queue_in, self.queue_out,
-                                          left_data=b'', min_length=32)
+                                  left_data=b'', min_length=16)
         self.addr = addr
+        self.encrypt_flag = encrypt_flag
         self.name = 'Device controler'
         self.connection = my_socket.MyClient(logger, addr, self_addr)
         self.state = 'close'
         self.sim_obj = None
-        #PHL = pkt head length for short
-        self.PHL = 32
-        self.version = b'\x03'
-        self.default_ecode_type = b'\x01'
-        #First four bytes for short
-        # \x01means data is in protobuf type , json type encode is unkown at present, so there is a todo keng
-        # may be here should be \x36\x20\x03\x02?
-        self.F4B = b'\x36\x20' + self.version + self.default_ecode_type
 
-    def msg_build(self, data, message_type, extern_msg_type=bytes(1), ctrl_addr=bytes(16), encode_type=b'\x01'):
+        # status data:
+        # 4bytes
+        self.version = b'HDXM'
+        # 20bytes
+        self.device_id = b'\x31\x30\x30\x34\x32\x30\x31\x36\x35\x38\x46\x43\x44\x42\x44\x38\x33\x34\x31\x45'
+        # 4bytes
+        self.pkg_number = b'\x00\x00\x00\x01'
+
+        #region 电表报文头相关变量
+        self.prefixHead = b'\xFE\xFE\xFE\xFE'
+        #endregion
+
+    def msg_build(self, data, ack=b'\x01'):
         self.LOG.yinfo("send msg: " + self.convert_to_dictstr(data))
-        r1 = b'\x00'
-        r2 = b'\x00'
-        msgtype = common_APIs.bit_set(message_type,7)
-        if 'message_type' in data:
-            msgtype = data['message_type']
-
-        ext_msgtype = extern_msg_type
-        if 'ext_msgtype' in data:
-            ext_msgtype = data['ext_msgtype']
-
-        ctrladdr = ctrl_addr
-        if 'ctrladdr' in data:
-            ctrladdr = data['ctrladdr']
-
-        if isinstance(data['data'], type(b'')):
+        # need encrypt
+        if self.encrypt_flag:
+            data = AES_CBC_encrypt(self.sim_obj._encrypt_key, data)
+        if isinstance(data, type(b'')):
             pass
         else:
-            data = data['data'].encode('utf-8')
-        msg_head = self.F4B[0:3] + encode_type
-        msg_data = data
-        msg_length = len(msg_data)
-        if 'data' in data:
-            msg_length = self.get_msg_length(data['data'])
-            msg_data = data['data']
-        msg = msg_head + msg_length + msgtype + ext_msgtype + r1 + ctrladdr + r2 + msg_data
+            data = data.encode('utf-8')
+        if ack == b'\x00':
+            src_id = self.device_id
+            dst_id = b'\x30' * 20
+            self.add_pkg_number()
+        else:
+            src_id = self.device_id
+            dst_id = b'\x30' * 20
+
+        if isinstance(src_id, type(b'')):
+            pass
+        else:
+            src_id = src_id.encode('utf-8')
+        msg_head = self.version + src_id + dst_id + ack + self.pkg_number
+        msg_length = self.get_msg_length(data)
+        msg_crc16 = crc16(data)
+        msg = msg_head + msg_length + b'\x00\x00' + msg_crc16 + data
         return msg
 
     def protocol_data_washer(self, data):
         data_list = []
         left_data = b''
 
-        while data[0:2] != self.F4B[0:2] and len(data) >= self.min_length:
-            self.LOG.warn('give up dirty data: %02x' % ord(str(data[0])))
+        while data[0:1] != self.prefixHead[0:1] and len(data) >= self.min_length:
+            #self.LOG.warn('give up dirty data: %02x' % ord(str(data[0])))
+            self.LOG.warn('give up dirty data: 0x%02x' % data[0])
             data = data[1:]
 
         if len(data) < self.min_length:
             left_data = data
         else:
-            #todo there should be ==Self.F4B[0:3]+\x01 or elf.F4B[0:3]+\x0?
-            if data[0:4] == self.F4B[0:3] + self.default_ecode_type:
-                length = struct.unpack('>I', data[4:8])[0]
-                if length <= len(data[self.PHL:]):
-                    data_list.append(data[0:self.PHL + length])
-                    data = data[self.PHL + length:]
+            if data[0:4] == self.prefixHead:
+                data_filed_len = ord(data[13:14])
+                length = data_filed_len + self.min_length #struct.unpack('>I', data[49:53])[0]
+                if length <= len(data):
+                    data_list.append(data[0:length])
+                    data = data[length:]
                     if data:
                         data_list_tmp, left_data_tmp = self.protocol_data_washer(
                             data)
@@ -93,7 +220,7 @@ class DB_Protocol(communication_base):
                     left_data = data
                 else:
                     for s in data[:4]:
-                        self.LOG.warn('give up dirty data: %02x' % ord(chr(s)))
+                        self.LOG.warn('give up dirty data: 0x%02x' % s)
                     left_data = data[4:]
             else:
                 pass
@@ -116,38 +243,41 @@ class DB_Protocol(communication_base):
 
     def protocol_handler(self, msg):
         ack = False
-        if msg[0:3] == self.F4B[0:3]:
-            #todo other condiction may be add here later
-            if True :
-                #\x01 protobuf \x0? Json
-                encode_type = msg[3]
-                data_length = struct.unpack('>I', msg[4:4+4])[0]
-                message_type = msg[8]
-                if message_type >= 128:
+        if msg[0:4] == self.prefixHead:
+            #目前貌似木有ACK
+            ack = False
+            self.LOG.info("recv msg: " + common_APIs.protocol_data_printB(msg))
+            rsp_msg:MessageType = self.sim_obj.protocol_handler(msg, ack)
+            if rsp_msg:
+                #final_rsp_msg = self.msg_build(rsp_msg)
+                final_rsp_msg = rsp_msg.buildRspMessage()
+            else:
+                final_rsp_msg = 'No_need_send'
+            return final_rsp_msg
+            '''if True or msg[4 + 20:4 + 20 + 20] == self.device_id or msg[4 + 20:4 + 20 + 20] == self.device_id.encode('utf-8'):
+                if msg[44:45] != b'\x00':
+                    # self.LOG.info("Get ack!")
                     ack = True
-                extern_msg_type = msg[9]
-                reserved_1 = msg[10:10+2]
-                ctrl_addr = msg[12:12+16]
-                reserved_2 = msg[28:28+4]
-                ori_data = msg[32:32+data_length]
-                # \x01 Protobuf \x0? Json
-                if encode_type == b'\x01':
-                    #use Protobuf to decode
-                    data = ori_data.decode('utf-8')
+                self.set_pkg_number(msg[45:49])
+                data_length = struct.unpack('>I', msg[49:53])[0]
+                crc16 = struct.unpack('>H', msg[55:57])
+                # need decrypt
+                if self.encrypt_flag:
+                    data = json.loads(AES_CBC_decrypt(self.sim_obj._encrypt_key,
+                                                      msg[57:57 + data_length]).decode('utf-8'))
                 else:
-                    data = json.loads(ori_data.decode('utf-8'))
+                    data = json.loads(msg[57:57 + data_length].decode('utf-8'))
                 self.LOG.info("recv msg: " + self.convert_to_dictstr(data))
-                rsp_msg = self.sim_obj.protocol_handler(data,ack)
+                rsp_msg = self.sim_obj.protocol_handler(data, ack)
                 if rsp_msg:
-                    final_rsp_msg = self.msg_build(rsp_msg, message_type, extern_msg_type, ctrl_addr)
+                    final_rsp_msg = self.msg_build(rsp_msg)
                 else:
                     final_rsp_msg = 'No_need_send'
                 return final_rsp_msg
 
             else:
                 self.LOG.error('Unknow msg: %s' % (msg))
-                return "No_need_send"
-
+                return "No_need_send"'''
         else:
             self.LOG.warn('Unknow msg: %s!' % (msg))
             return "No_need_send"
@@ -178,14 +308,19 @@ class DB_Protocol(communication_base):
 
     def recv_data(self):
         return self.connection.recv_once()
-
-    if __name__ == '__main__':
-        m = b'\x70'
-        m2 = b'\x80'
-        if m2 in m :
-            print("IN")
-        else:
-            print("NOT IN")
-        #n = bytearray(m)[0]+ bytearray(m2)[0]
-        #print(n.to_bytes(1,byteorder="big"))
-        pass
+import time
+if __name__ == '__main__':
+    start = datetime.datetime.now()
+    #data = b'\xfe\xfe\xfe\xfe\x68\xaa\xaa\xaa\xaa\xaa\xaa\x68\x13\x00\xdf\x16'
+    data = b'\xfe\xfe\xfe\xfe\x68\xaa\xaa\xaa\xaa\xaa\xaa\x68\x13\x05\x45\x67\x89\xab\xc3\x87\x16'
+    m = MessageType(data)
+    #testbin = b'\x45\x67\x89\xab\xc3'
+    #newdata = m._MessageType__process33h("-")
+    m.set_addr("598888881000")
+    newdata = m.buildRspMessage()
+    m.getBinStr(data)
+    m.getBinStr(newdata)
+    print(len(newdata))
+    time.sleep(0)
+    print((datetime.datetime.now()-start).total_seconds())
+    #print(common_APIs.protocol_data_printB(bytes(newdata)))

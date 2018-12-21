@@ -61,14 +61,14 @@ class ArgHandle():
             '-i', '--server-IP',
             dest='server_IP',
             action='store',
-            default='10.101.72.100',
+            default='10.101.72.29',
             help='Specify TCP server IP address',
         )
         parser.add_argument(
             '--config',
             dest='config_file',
             action='store',
-            default="cdz_cz_conf",
+            default="cdz_db_conf",
             help='Specify device type',
         )
         parser.add_argument(
@@ -116,7 +116,7 @@ class ArgHandle():
 class MyCmd(Cmd):
     def __init__(self, logger, sim_objs=None):
         Cmd.__init__(self)
-        self.prompt = "CDZ>"
+        self.prompt = "DB>>>"
         self.sim_objs = sim_objs
         self.LOG = logger
         self.ControlIndex = -1
@@ -314,7 +314,7 @@ def delallLog(doit = True):
                 print("file:%s is removed" % (file,))
 
 
-
+import time
 if __name__ == '__main__':
     delallLog()
     sys_init()

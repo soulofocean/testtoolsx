@@ -18,9 +18,9 @@ getTimeSpanS = lambda a,b : (a-b).seconds
 getStrTsS = lambda a,b : getTimeSpanS(getDateFromStr(a),getDateFromStr(b))
 
 Attribute_initialization = {
-    "mac_list": ['59:88:88:88:' + re.sub(r'^(?P<xx>\d\d)', "\g<xx>:", str(i)) for i in range(1000, 4000)],
+    "mac_list": ['59:99:99:99:' + re.sub(r'^(?P<xx>\d\d)', "\g<xx>:", str(i)) for i in range(1000, 4000)],
     "DeviceFacturer": 1008,
-    "DeviceType": 2025,
+    "DeviceType": 2026,
     #额定电压2200代表220V
     "RatedV":2200,
     #电压波动范围，正负15%，超过或者不足会触发过压/欠压保护和相应事件上报

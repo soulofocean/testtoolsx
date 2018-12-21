@@ -19,7 +19,7 @@ from importlib import import_module
 from protocol.basic_devices import BaseSim
 from basic.task import Task
 from protocol.light_protocol import SDK
-from protocol.db_ptotocol import DB_Protocol
+from protocol.db_ptotocol import DB_Protocol,MessageType
 class ReportType:
     '''上报状态'''
     PERIOD_PERIOD = 10000
@@ -58,6 +58,10 @@ class ReasonType:
     DevFault = 2
     GunStatusChange = 3
 
+class CmdType:
+    ReadAddr = 0x13
+    ReadData = 0x11
+
 class DB_Dev(BaseSim):
     type_lock = threading.Lock()
     charging_lock = threading.Lock()
@@ -71,9 +75,9 @@ class DB_Dev(BaseSim):
         self.N = N
         self.tt = tt
         self.encrypt_flag = encrypt_flag
-        self.iniFile = "CDZ.ini"
+        #self.iniFile = "CDZ.ini"
         self.attribute_initialization()
-        self.sdk_obj = SDK(logger=logger, addr=server_addr, self_addr=self_addr)
+        self.sdk_obj = DB_Protocol(logger=logger, addr=server_addr, self_addr=self_addr)
         self.sdk_obj.sim_obj = self
         self.sdk_obj.device_id = self._deviceID
         self.need_stop = False
@@ -84,8 +88,8 @@ class DB_Dev(BaseSim):
         self.command_list = getattr(self.sim_config, "Command_list")
         # self.create_tasks()
 
-        # 心跳为30秒发送一次
-        self.heartbeat_interval_s = 30
+        # 心跳为60秒发送一次
+        self.heartbeat_interval_s = 60
         # 延迟1秒注册
         self.reg_dev_relay_s = 1
         # 充电中10秒上报一次状态
@@ -113,7 +117,7 @@ class DB_Dev(BaseSim):
         for th in thread_ids:
             th.setDaemon(True)
             th.start()
-        self.to_register_dev()
+        #self.to_register_dev()
 
     def to_register_dev(self):
         if self.dev_register:
@@ -127,9 +131,11 @@ class DB_Dev(BaseSim):
     def to_send_heartbeat(self):
         while self.need_stop == False:
             self.LOG.info("8.4.1 heartbeat")
-            if self.dev_register:
-                self.send_msg(json.dumps(
-                    self.get_send_msg('COM_HEARTBEAT')), ack=b'\x00')
+            #if self.dev_register:
+            #    self.send_msg(json.dumps(
+            #        self.get_send_msg('COM_HEARTBEAT')), ack=b'\x00')
+            #self.send_msg(json.dumps(self.get_send_msg('COM_HEARTBEAT')), ack=b'\x00')
+            self.sdk_obj.add_send_data("H"+self._mac.replace(":",""))
             time.sleep(self.heartbeat_interval_s)
 
     def send_charging_report_by_thread(self):
@@ -416,87 +422,32 @@ class DB_Dev(BaseSim):
     #endregion
 
     def protocol_handler(self, msg, ack=False):
+        Msg = MessageType(msg)
+        self.LOG.debug(str(Msg.__dict__))
         if ack:
-            self.update_msgst(msg['Command'], 'rsp')
-            if msg['Command'] == 'COM_DEV_REGISTER':
-                if msg['Result'] == 0:
-                    self.dev_register = True
-                    # decrypt
-                    if self.encrypt_flag:
-                        self.add_item('_encrypt_key', msg['Data'][0]['aeskey'])
-                    self.LOG.warn(common_APIs.chinese_show("设备已经注册"))
-                    return None
-                else:
-                    self.dev_register = False
-                    self.LOG.warn(common_APIs.chinese_show("设备注册失败"))
-                    return None
-            elif msg['Command'] == 'COM_IC_CARD_REQ_CHARGE':
-                if msg['Result'] == 0:
-                    self.set_items(msg['Command'], msg)
-                    if self.get_item("_icType"==1):
-                        #region 处理IC卡开始充电
-                        tI = self.get_item("SwitchMinI")
-                        self.set_item("_currentI", tI)
-                        realTimeStr = self.sim_config.getDateStr()
-                        self.set_item("_startTime", realTimeStr)
-                        self.set_item("_currentTime", realTimeStr)
-                        self.set_item("_lastReportTime", realTimeStr)
-                        swStatus = self.getSwitchStatus()
-                        if swStatus == SwitchStatus.Only3:
-                            if self.try_set_item("_switch3Status", 2):
-                                self.send_charging_report_onetime(ReportType.SWITCH3_CHANGE)
-                        elif swStatus == SwitchStatus.Only7:
-                            if self.try_set_item("_switch7Status", 4):
-                                self.send_charging_report_onetime(ReportType.SWITCH7_CHANGE)
-                        realPower = tI * self.get_item("_voltageOut") / 1000
-                        self.set_item("_power", round(realPower))
-                        self.send_msg(self.get_upload_start_result(), ack=b'\x00')
-                        self.set_item("_isCharging", 1)
-                        self.send_charging_report_by_thread()
-                        #endregion
-                    else:
-                        #region 处理IC卡停止充电
-                        self.set_endTime_to_currentTime()
-                        self.set_charging_status(0)
-                        self.set_item("_result", 0)
-                        self.send_msg(self.get_upload_stop_result(), ack=b'\x00')
-                        self.send_charging_report_onetime(ReportType.CHARGE_RECORD_UPLOAD, isEndReport=True)
-                        #endregion
-                else:
-                    self.LOG.error("COM_IC_CARD_REQ_CHARGE 返回失败")
-                return None
-            else:
-                return None
-        else:
-            self.update_msgst(msg['Command'], 'req')
-        if msg['Command'] == 'COM_HEARTBEAT'or msg['Command'] == 'COM_IC_CARD_REQ_CHARGE':
-            pass
-        elif msg['Command'] in self.command_list:
-            self.set_items(msg['Command'], msg)
-            if msg['Command'] == 'COM_SET_QR_CODE':
-                # 如果当前有打开图片，先关掉
-                os.system("taskkill /f /t /im dllhost.exe")
-                common_APIs.GetQrCodeByUrlAndSn(self.get_item("_url"),
-                                                self.get_item("_sn"), imgFile=self.get_item("_qcodeFile"))
-                common_APIs.save_ini_file(self.iniFile, self._deviceID,
-                                          url=self.get_item("_url"), sn=self.get_item("_sn"))
-            elif msg['Command'] == 'COM_START_CHARGE':
-                self.handle_start_charge()
-                # handle_start_charge已经发过了ACK，这里不需要返回再发了，所以返回None
-                return None
-            elif msg['Command'] == 'COM_STOP_CHARGE':
-                self.handle_stop_charge()
-                return None
-            elif msg['Command'] == 'COM_POWER_CONTROL':
-                self.handle_power_control()
-            elif msg['Command'] == 'COM_SET_LOCK':
-                self.handle_set_lock()
-            rsp_msg = self.get_rsp_msg(msg['Command'])
-            self.update_msgst(msg['Command'], 'rsp')
-            return json.dumps(rsp_msg)
-        else:
-            self.LOG.warn('Unknow msg: %s!' % (msg['Command']))
+            self.update_msgst(Msg.cmd, 'rsp')
+            self.LOG.info("Received Ack Msg:{0}".format(Msg.cmd))
             return None
+        else:
+            self.update_msgst(Msg.cmd, 'req')
+        if Msg.cmd == CmdType.ReadAddr:
+            Msg.set_addr(self._mac.replace(":",""))
+        elif Msg.cmd == CmdType.ReadData:
+            logmsg = Msg.set_datafield(self.get_data_dict())
+            if logmsg != None:
+                self.LOG.error(logmsg)
+        else:
+            self.LOG.warn('Unknow msg: %d!' % Msg.cmd)
+            return None
+        return Msg
+
+    def get_data_dict(self):
+        datadict = {}
+        datadict["aI"]=100000
+        datadict["bI"] = 150000
+        datadict["cI"] = 200000
+        datadict["tPower"] = round((datadict["aI"]+datadict["bI"]+datadict["cI"])*2200e-4)
+        return datadict
 
     def get_msg_by_command(self, command):
         command = getattr(self.sim_config, command)
@@ -546,12 +497,14 @@ class DB_Dev(BaseSim):
         # self._decrypt_key = self._deviceID[-16:].encode('utf-8')
         # self._subDeviceID = str(self.subDeviceType) + \
         # self._mac.replace(":", '') + "%04d" % (self.N + 1)
-        qcodeDict = common_APIs.read_ini_file(self.iniFile, self._deviceID, "url", "sn")
-        if "url" in qcodeDict and "sn" in qcodeDict:
-            self.set_item("_sn", qcodeDict["sn"])
-            self.set_item("_url", qcodeDict["url"])
-            common_APIs.ShowQrCodeImage(self._url, self._sn, self._qcodeFile)
+        #qcodeDict = common_APIs.read_ini_file(self.iniFile, self._deviceID, "url", "sn")
+        #if "url" in qcodeDict and "sn" in qcodeDict:
+        #    self.set_item("_sn", qcodeDict["sn"])
+        #    self.set_item("_url", qcodeDict["url"])
+        #    common_APIs.ShowQrCodeImage(self._url, self._sn, self._qcodeFile)
 
+
+    #region 充电桩插座才有的处理逻辑
     def set_abnormal_status(self,reason:int, status:int = 1):
         #急停状态无改变则不触发任何事情
         status_key = "_urgentStatus"
@@ -575,8 +528,7 @@ class DB_Dev(BaseSim):
             #无论是否在充电都要上报，在充电时isEndReport为TRUE，重置电流和功率为0
             #不在充电时电流和功率本就为0，重置也不影响，但是为了防止重置逻辑更改，此处不充电时设置为FALSE
             self.send_charging_report_onetime(report_type, isEndReport=inCharging)
-
-
+    #endregion
     # region 暂时不用的功能
     def create_tasks(self):
         pass
