@@ -443,9 +443,9 @@ class DB_Dev(BaseSim):
 
     def get_data_dict(self):
         datadict = {}
-        datadict["aI"]=100000
-        datadict["bI"] = 150000
-        datadict["cI"] = 200000
+        datadict["aI"]=1000
+        datadict["bI"] = 1500
+        datadict["cI"] = 2000
         datadict["tPower"] = round((datadict["aI"]+datadict["bI"]+datadict["cI"])*2200e-4)
         return datadict
 
