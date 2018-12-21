@@ -30,16 +30,16 @@ Attribute_initialization = {
     #最小功率充电时候的电流单位:毫安
     "SwitchMinI":6000,
     #3孔最大电流，超过会触发过流保护，自动断电,标准电流为16A
-    "Switch3MaxI":18000,
+    "Switch3MaxI":16000,
     #7孔最大电流，超过会触发过流保护，自动断电，标准电流为32A
-    "Switch7MaxI":32000 * 1.1,
+    "Switch7MaxI":32000,
     "comPowerCtlResult": 0,
     "comSetLockResult":0,
     #"subDeviceType": 3010,
     "_RegisterType": 1,
     "_name": 'CDZCZ',
     "_manufacturer": 'HD',
-    "_ip": "192.168.0.235",
+    "_ip": "127.0.0.1",
     "_mask": '255.255.255.0',
     "_version": '1.0.01',
     "_algVersionInfo":"8.8.8",
@@ -430,7 +430,7 @@ COM_UPLOAD_START_RESULT = {
         "Data": [
                 {
                     "result": "##self._result##",
-                    "reason":"##self._switchStatus##",
+                    "switchStatus":"##self._switchStatus##",
                     "startTime":"##self._startTime##",
                     "power":"##self._power##",
                     "orderNumber":"##self._orderNumber##"
