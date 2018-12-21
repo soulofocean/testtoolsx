@@ -18,9 +18,9 @@ import threading
 from binascii import unhexlify
 from subprocess import *
 import qrcode
-from PIL import  Image
-from PIL import ImageDraw
-from PIL import ImageFont
+#from PIL import  Image
+#from PIL import ImageDraw
+#from PIL import ImageFont
 import configparser
 
 import crcmod.predefined
@@ -36,16 +36,16 @@ def file_unlock(open_file):
 file_lock = threading.Lock()
 
 
-def GetQrCodeByUrlAndSn(url,sn,imgFile='qrcode.png',snTtf='arial2.ttf',snSize=20,showImg=True):
+def GetQrCodeByUrlAndSn(url,sn,imgFile='qrcode.png',snTtf='arial2.ttf',snSize=20,showImg=False):
     '''将URL和SN生成二维码保存到imgFile中，SN字体采用snTtf，大小为snSize，showImg为TRUE显示生成的图片'''
     img = qrcode.make(url)
     img.save(imgFile)
-    img = Image.open(imgFile)
-    w, h = img.size
-    font = ImageFont.truetype(font=snTtf, size=snSize)
-    draw = ImageDraw.Draw(img)
-    draw.text(((w - 100) / 2, h - 30), sn, font=font)
-    img.save(imgFile)
+    #img = Image.open(imgFile)
+    #w, h = img.size
+    #font = ImageFont.truetype(font=snTtf, size=snSize)
+    #draw = ImageDraw.Draw(img)
+    #draw.text(((w - 100) / 2, h - 30), sn, font=font)
+    #img.save(imgFile)
     if showImg:
         #img.show()
         os.system(imgFile)
