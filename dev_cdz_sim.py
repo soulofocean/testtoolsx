@@ -266,7 +266,7 @@ class MyCmd(Cmd):
     def do_ctl(self, arg, opt=None):
         args = arg.split()
         if len(args) != 1 and not args[0].isdigit():
-            return self.help_us()
+            return self.help_ctl()
         val = int(args[0])
         if(val > len(sims)-1):
             return self.do_show()
