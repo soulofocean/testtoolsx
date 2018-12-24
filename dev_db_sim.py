@@ -15,7 +15,7 @@ from cmd import Cmd
 
 import APIs.common_APIs as common_APIs
 from basic.log_tool import MyLogger
-from protocol.db_devices import DB_Dev,ReportType
+from protocol.db_devices import DB_Dev
 from basic.cprint import cprint
 
 
@@ -40,14 +40,6 @@ class ArgHandle():
             default=0,
             type=int,
             help='special device ids',
-        )
-        parser.add_argument(
-            '-e', '--encrypt',
-            dest='encrypt',
-            action='store',
-            default=0,
-            type=int,
-            help='encrypt',
         )
         parser.add_argument(
             '-p', '--server-port',
@@ -171,11 +163,6 @@ class MyCmd(Cmd):
         args = arg.split()
         for i in self.sim_objs:
             i.set_item(args[0], args[1])
-        #print(args[0] == "_isCharging")
-        #print(args[1] == "1")
-        #if args[0] == "_isCharging" and args[1] == "1":
-        #    self.sim_objs[0].set_item(args[0], int(args[1]))
-        #    self.sim_objs[0].send_charging_report_onetime()
 
     def default(self, arg, opts=None):
         try:
@@ -194,69 +181,6 @@ class MyCmd(Cmd):
         sys_cleanup()
         sys.exit()
 
-    def help_c(self):
-        cprint.notice_p("INPUT: c [3,7] [status]")
-        cprint.notice_p("3 status: 0表示未连接，1表示连接但是未供电，2表示正在供电中")
-        cprint.notice_p("7 status: 0表示未连接，1表示插座、枪已连接好，2表示插座、枪、车已经连接好但是未供电，"
-                        "3表示插座、枪、车已经连接好且已经给车发送开始充电指令，4表示插座、枪、车已经连接好且正在充电")
-        cprint.notice_p("3孔只能设置[0,1] 7孔只能设置[0,1,2]")
-        cprint.notice_p("设置3孔状态大于1的时候7孔会联动设置为0，反之亦然")
-
-    def do_c(self,arg,opts=None):
-        args = arg.split()
-        if len(args)!=2 or args[0] not in ["3","7"]:
-            return self.help_c()
-        if (args[0]=="3" and args[1] not in ("0","1")) or (args[0]=="7" and args[1] not in ("0","1","2")):
-            return self.help_c()
-        if not sims:
-            return self.do_show()
-        if self.ControlIndex == -1:
-            for s in sims:
-                s.switch_connect(int(args[0]),int(args[1]))
-        else:
-            self.sim_objs[self.ControlIndex].switch_connect(int(args[0]),int(args[1]))
-
-    def help_us(self):
-        cprint.notice_p("模拟各种异常事件")
-        cprint.notice_p("INPUT: us [reason] [status] ")
-        cprint.notice_p("reason : [1:模拟急停事件，2:模拟设备故障]")
-        cprint.notice_p("急停status : [0:离开急停状态，1:进入急停状态]")
-        cprint.notice_p("设备故障status : [0：正常 1：过压 2：欠压 3：过流 4：过温 5：漏电]")
-
-    def do_us(self,arg, opt=None):
-        args = arg.split()
-        if len(args) != 2 or args[0] not in {"1", "2"}:
-            return self.help_us()
-        if (int(args[0]) == 1 and args[1] not in {'0','1'}) \
-                or (int(args[0]) == 2 and args[1] not in {'0','1','2','3','4','5'}):
-                return self.help_us()
-        reason = int(args[0])
-        status = int(args[1])
-        if reason == 2 and status != 0:
-            status = 2 ** (status-1)
-        if not sims:
-            return self.do_show()
-        if self.ControlIndex == -1:
-            for s in sims:
-                s.set_abnormal_status(reason,status)
-        else:
-            self.sim_objs[self.ControlIndex].set_abnormal_status(reason,status)
-
-    def help_ic(self):
-        cprint.notice_p("模拟IC卡充电")
-        cprint.notice_p("INPUT: ic [status] ")
-        cprint.notice_p("status : [0:停止充电，1:开始充电]")
-
-    def do_ic(self,arg,opt=None):
-        args = arg.split()
-        if len(args) != 1 or args[0] not in ["0", "1"]:
-            return self.help_ic()
-        if self.ControlIndex == -1:
-            for s in sims:
-                s.send_ic_charging_req(int(args[0]))
-        else:
-            self.sim_objs[self.ControlIndex].send_ic_charging_req(int(args[0]))
-
     def help_ctl(self):
         cprint.notice_p("设置要操作的设备序列号")
         cprint.notice_p("ctl [index]")
@@ -266,7 +190,7 @@ class MyCmd(Cmd):
     def do_ctl(self, arg, opt=None):
         args = arg.split()
         if len(args) != 1 and not args[0].isdigit():
-            return self.help_us()
+            return self.help_ctl()
         val = int(args[0])
         if(val > len(sims)-1):
             return self.do_show()
@@ -340,8 +264,7 @@ if __name__ == '__main__':
 
         sim = DB_Dev(logger=dev_LOG, config_file=arg_handle.get_args('config_file'),
                   server_addr=(arg_handle.get_args('server_IP'), arg_handle.get_args('server_port')),
-                  N=arg_handle.get_args('xx') + i,tt=arg_handle.get_args('tt'),
-                  encrypt_flag=arg_handle.get_args('encrypt'), self_addr=self_addr)
+                  N=arg_handle.get_args('xx') + i,tt=arg_handle.get_args('tt'), self_addr=self_addr)
         if self_addr:
             sim.set_item('_ip', self_addr[0])
         sim.run_forever()
