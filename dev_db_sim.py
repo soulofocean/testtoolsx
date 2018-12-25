@@ -126,9 +126,9 @@ class MyCmd(Cmd):
             '4': logging.DEBUG,
         }
         if int(arg) in range(5):
-            for i in self.sim_objs:
+            for sim in self.sim_objs:
                 cprint.notice_p("=" * 40)
-                self.sim_objs[i].LOG.set_level(level[arg])
+                sim.LOG.set_level(level[arg])
         else:
             cprint.warn_p("unknow log level: %s!" % (arg))
 
@@ -139,22 +139,6 @@ class MyCmd(Cmd):
         for i in range(len(self.sim_objs)):
             cprint.notice_p("-" * 20)
             self.sim_objs[i].status_show()
-
-    def help_record(self):
-        cprint.notice_p("send record:")
-
-    def do_record(self, arg, opts=None):
-        for i in self.sim_objs:
-            i.send_msg(
-                i.get_upload_record(int(arg)))
-
-    def help_event(self):
-        cprint.notice_p("send event")
-
-    def do_event(self, arg, opts=None):
-        for i in self.sim_objs:
-            i.send_msg(
-                i.get_upload_event(int(arg)))
 
     def help_set(self):
         cprint.notice_p("set state")
