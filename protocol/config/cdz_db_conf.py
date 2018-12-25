@@ -11,11 +11,11 @@ Attribute_initialization = {
     "DeviceFacturer": 1008,
     "DeviceType": 2026,
     #电表报的A相电流，单位为毫安
-    "ACurrent" : 1000,
+    "ACurrent" : 4 * 1000,
     #电表报的B相电流，单位为毫安
-    "BCurrent" : 2000,
+    "BCurrent" : 3 * 1000,
     #电表报的C相电流，单位为毫安
-    "CCurrent" : 3000,
+    "CCurrent" : 2 * 1000,
     # region 暂时不用的配置变量
     "SPECIAL_ITEM": {
         "_State": {
@@ -35,3 +35,6 @@ Attribute_initialization = {
     }
     #endregion
 }
+
+if __name__ == '__main__':
+    print(['59:99:99:99:' + re.sub(r'^(?P<xx>\d\d)', "\g<xx>:", str(i)) for i in range(9999, 10001)])
