@@ -433,7 +433,7 @@ class CDZ_Dev(BaseSim):
                     # decrypt
                     if self.encrypt_flag:
                         self.add_item('_encrypt_key', msg['Data'][0]['aeskey'])
-                    self.LOG.warn(common_APIs.chinese_show("设备注册成功[{}]\n".format(self._deviceID)))
+                    self.LOG.warn(common_APIs.chinese_show("设备注册成功[{}]".format(self._deviceID)))
                     return None
                 else:
                     self.dev_register = False
