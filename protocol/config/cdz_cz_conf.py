@@ -18,7 +18,7 @@ getTimeSpanS = lambda a,b : (a-b).seconds
 getStrTsS = lambda a,b : getTimeSpanS(getDateFromStr(a),getDateFromStr(b))
 
 Attribute_initialization = {
-    "mac_list": ['59:88:88:88:' + re.sub(r'^(?P<xx>\d\d)', "\g<xx>:", str(i)) for i in range(1000, 1020)],
+    "mac_list": ['59:88:88:88:' + re.sub(r'^(?P<xx>\d\d)', "\g<xx>:", str(i)) for i in range(1000, 1021)],
     "DeviceFacturer": 1008,
     "DeviceType": 2025,
     #额定电压2200代表220V
