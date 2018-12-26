@@ -100,15 +100,16 @@ class CDZ_Dev(BaseSim):
 
     def run_forever(self):
         thread_list = []
+        thread_list.append([self.sdk_obj.recv_data_loop])
         thread_list.append([self.sdk_obj.schedule_loop])
         thread_list.append([self.sdk_obj.send_data_loop])
-        thread_list.append([self.sdk_obj.recv_data_loop])
         # thread_list.append([self.sdk_obj.heartbeat_loop])
         thread_list.append([self.to_send_heartbeat])
         # thread_list.append([self.task_obj.task_proc])
         # thread_list.append([self.status_maintain])
         # thread_list.append([self.status_report_monitor])
         # thread_list.append([self.msg_dispatch])
+        thread_list.append([self.to_register_dev])
         thread_ids = []
         for th in thread_list:
             thread_ids.append(threading.Thread(target=th[0], args=th[1:]))
@@ -116,10 +117,10 @@ class CDZ_Dev(BaseSim):
         for th in thread_ids:
             th.setDaemon(True)
             th.start()
-        time.sleep(self.reg_dev_relay_s)
-        self.to_register_dev()
+        #self.to_register_dev()
 
     def to_register_dev(self):
+        time.sleep(self.reg_dev_relay_s)
         if self.dev_register:
             self.LOG.warn(common_APIs.chinese_show("设备已经注册[{}]".format(self._deviceID)))
         else:
@@ -432,11 +433,11 @@ class CDZ_Dev(BaseSim):
                     # decrypt
                     if self.encrypt_flag:
                         self.add_item('_encrypt_key', msg['Data'][0]['aeskey'])
-                    self.LOG.warn(common_APIs.chinese_show("设备注册成功[{}]".format(self._deviceID)))
+                    self.LOG.warn(common_APIs.chinese_show("设备注册成功[{}]\n".format(self._deviceID)))
                     return None
                 else:
                     self.dev_register = False
-                    self.LOG.warn(common_APIs.chinese_show("设备注册失败[{}]".format(self._deviceID)))
+                    self.LOG.error(common_APIs.chinese_show("设备注册失败[{}]".format(self._deviceID)))
                     return None
             elif msg['Command'] == 'COM_IC_CARD_REQ_CHARGE':
                 if msg['Result'] == 0:
