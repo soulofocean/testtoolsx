@@ -6,10 +6,10 @@ import re
 
 # 设备初始化参数
 Attribute_initialization = {
-    "mac_list": ['58:FC:DB:DA:' + re.sub(r'^(?P<xx>\d\d)', "\g<xx>:", str(i)) for i in range(1000, 4000)],
-    "DeviceFacturer": 1010,
+    "mac_list": ['59:FC:DB:DB:' + re.sub(r'^(?P<xx>\d\d)', "\g<xx>:", str(i)) for i in range(1001, 4000)],
+    "DeviceFacturer": 1009,
     "DeviceType": 2020,
-    "subDeviceType": 3010,
+    "subDeviceType": 3063,
     "_type": 0,
     "_name": 'cat door',
     "_manufacturer": 'HDIOT',
@@ -27,6 +27,8 @@ Attribute_initialization = {
     "_CredenceType": 5,
     "_credenceNo": '12345678',
     "_State": 0,
+    "_openDuration":10,
+    "_alarmTimeout":20,
 
     "SPECIAL_ITEM": {
         "_State": {
@@ -44,7 +46,7 @@ Attribute_initialization = {
         "msgs": {
             #"COM_UPLOAD_DEV_STATUS": 30,
             #"COM_UPLOAD_RECORD.Data[0].RecordType.10002": 6,
-            #"COM_UPLOAD_EVENT.Data[0].EventType.30301": 1,
+            "FAC_UPLOAD_BA_STATUS": 1,
         }
     }
 }
@@ -73,6 +75,7 @@ Command_list = {
     "COM_DELETE_CERTIFICATE_IN_BATCH": {"msg": "清除固定凭证操作"},
     "COM_GATE_CONTROL": {"msg": "开关闸（门）"},
     "COM_QUERY_DEV_STATUS": {"msg": "设备状态查询"},
+    "FAC_UPLOAD_BA_STATUS":{"msg": "设备状态查询"}
 }
 
 
@@ -113,6 +116,27 @@ COM_UPLOAD_RECORD = {
                     "CredenceType": "##self._CredenceType##",
                     "credenceNo": "##self._credenceNo##",
                     "passType": 0,
+                }
+        ]
+    }
+}
+
+FAC_UPLOAD_BA_STATUS = {
+    "send_msg": {
+        "Command": 'FAC_UPLOAD_BA_STATUS',
+        "Data": [
+                {
+                    "statusList":[{
+                            "deviceID":"##self._subDeviceID##",
+                            "carID":"01",
+                            " physicalfloor": 14,
+                            " displayfloor": "13A",
+                            "status":"01",
+                            "doorStatus":"13",
+                            "errorStatus":"0000",
+                            "errorMessage":""
+                     }],
+                    "timestamp":"TIMENOW"
                 }
         ]
     }
