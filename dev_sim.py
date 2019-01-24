@@ -61,7 +61,7 @@ class ArgHandle():
             '-e', '--encrypt',
             dest='encrypt',
             action='store',
-            default=1,
+            default=0,
             type=int,
             help='encrypt',
         )
@@ -77,14 +77,14 @@ class ArgHandle():
             '-i', '--server-IP',
             dest='server_IP',
             action='store',
-            default='192.168.10.12',
+            default='10.101.70.52',
             help='Specify TCP server IP address',
         )
         parser.add_argument(
             '--config',
             dest='config_file',
             action='store',
-            default="door_conf",
+            default="elev_conf",
             help='Specify device type',
         )
         parser.add_argument(
