@@ -124,6 +124,9 @@ class Dev(BaseSim):
                 elif tmp_msg[0] == 'COM_UPLOAD_EVENT':
                     self.send_msg(self.get_upload_event(
                         tmp_msg[-1]), ack=b'\x00')
+                elif tmp_msg[0] == 'FAC_UPLOAD_BA_STATUS':
+                    self.send_msg(self.get_upload_ba_status(
+                        tmp_msg[-1]), ack=b'\x00')
                 else:
                     self.LOG.error("Unknow msg to dispatch: %s" % (msg))
 
@@ -201,6 +204,13 @@ class Dev(BaseSim):
         report_msg = self.get_send_msg('COM_UPLOAD_EVENT')
         report_msg["Data"][0]["EventType"] = event_type
         report_msg["EventCode"] = event_type
+        return json.dumps(report_msg)
+
+    def get_upload_ba_status(self,event_type):
+        self.LOG.warn(common_APIs.chinese_show("BA_STATUS上报"))
+        report_msg = self.get_send_msg('FAC_UPLOAD_BA_STATUS')
+        #report_msg["Data"][0]["EventType"] = event_type
+        #report_msg["EventCode"] = event_type
         return json.dumps(report_msg)
 
     def protocol_handler(self, msg, ack=False):
