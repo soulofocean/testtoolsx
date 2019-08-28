@@ -69,29 +69,29 @@ class ArgHandle():
             '-p', '--server-port',
             dest='server_port',
             action='store',
-            default=20001,
+            default=2001,
             type=int,
-            help='Specify TCP server port, default is 20001',
+            help='Specify TCP server port, default is 2001',
         )
         parser.add_argument(
             '-i', '--server-IP',
             dest='server_IP',
             action='store',
-            default='10.101.70.52',
+            default='10.101.72.80',
             help='Specify TCP server IP address',
         )
         parser.add_argument(
             '--config',
             dest='config_file',
             action='store',
-            default="elev_conf",
+            default="car_conf",
             help='Specify device type',
         )
         parser.add_argument(
             '-c', '--count',
             dest='device_count',
             action='store',
-            default=1,
+            default=6,
             type=int,
             help='Specify how many devices to start, default is only 1',
         )
